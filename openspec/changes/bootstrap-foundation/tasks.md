@@ -5,7 +5,7 @@
 - [x] 1.1 Restore and build `Baton.sln` on .NET 10 SDK; verify `dotnet build -c Release` has zero warnings
 - [x] 1.2 Run `dotnet list package --outdated`, bump pinned versions in `Directory.Packages.props`; verify restore succeeds
 - [x] 1.3 Set `TreatWarningsAsErrors=true` in `Directory.Build.props`; verify CI build stays green
-- [ ] 1.4 Decide `.sln` vs `.slnx` (`dotnet sln migrate`); verify the chosen file opens in VS/Rider and builds in CI
+- [x] 1.4 Decide `.sln` vs `.slnx` (`dotnet sln migrate`); verify the chosen file opens in VS/Rider and builds in CI *(Baton.slnx; opened in Rider, CI run 40101014783)*
 
 ## 2. Database schema
 
