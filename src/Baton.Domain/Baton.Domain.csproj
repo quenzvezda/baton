@@ -6,6 +6,10 @@
     <ProjectReference Include="..\Baton.Abstractions\Baton.Abstractions.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <!-- AddWorkflows only; no container, no I/O (M1 design "Placement") -->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+  <ItemGroup>
     <InternalsVisibleTo Include="Baton.Domain.Tests" />
   </ItemGroup>
 </Project>

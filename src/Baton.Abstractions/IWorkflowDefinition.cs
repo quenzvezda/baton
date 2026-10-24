@@ -9,6 +9,9 @@ public interface IWorkflowDefinition
     /// <summary>Bump on any change to the graph or task options; a changed graph under the same version fails startup.</summary>
     int Version { get; }
 
+    /// <summary>Label shown in the catalog. Not part of the graph hash, so changing it needs no version bump.</summary>
+    string DisplayName { get; }
+
     Type ParamsType { get; }
 
     void Build(IWorkflowBuilder builder);
@@ -18,6 +21,10 @@ public abstract class WorkflowDefinition<TParams> : IWorkflowDefinition
 {
     public abstract string Key { get; }
     public abstract int Version { get; }
+
+    /// <summary>Defaults to the key in words: <c>nightly-sales-report</c> → "Nightly sales report".</summary>
+    public virtual string DisplayName => FromKey(Key);
+
     public Type ParamsType => typeof(TParams);
 
     public void Build(IWorkflowBuilder builder)
@@ -27,4 +34,10 @@ public abstract class WorkflowDefinition<TParams> : IWorkflowDefinition
     }
 
     protected abstract void Define(IWorkflowBuilder<TParams> wf);
+
+    private static string FromKey(string key)
+    {
+        var words = key.Replace('-', ' ');
+        return words.Length == 0 ? words : char.ToUpperInvariant(words[0]) + words[1..];
+    }
 }

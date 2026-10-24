@@ -1,3 +1,4 @@
+using Baton.Persistence.Definitions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
@@ -21,6 +22,7 @@ public static class PersistenceServiceCollectionExtensions
         services.AddSingleton(_ => NpgsqlDataSource.Create(connectionString));
         services.AddDbContext<BatonDbContext>((sp, options) =>
             options.UseNpgsql(sp.GetRequiredService<NpgsqlDataSource>()));
+        services.AddSingleton<WorkflowRegistrar>();
         return services;
     }
 

@@ -65,11 +65,11 @@ Each definition SHALL be identified by `key@version` and a hash of its canonical
 - **THEN** version 2 remains in the catalog and its runs keep referencing version 2
 
 ### Requirement: Per-task execution options (WF-05)
-Each task SHALL support retry attempts and backoff, a timeout, a trigger rule, required host labels and a priority offset; unspecified options SHALL default to 3 attempts, 30 s initial delay, multiplier 2, maximum delay 10 minutes and trigger rule AllSuccess.
+Each task SHALL support retry attempts and backoff, a timeout, a trigger rule, required host labels and a priority offset; unspecified options SHALL default to 3 attempts, 30 s initial delay, multiplier 2, maximum delay 10 minutes, a 1 hour timeout and trigger rule AllSuccess.
 
 #### Scenario: Defaults apply
 - **WHEN** a task declares no options
-- **THEN** its registered graph shows 3 attempts, 30 s initial delay, multiplier 2, 10 minute maximum delay and AllSuccess
+- **THEN** its registered graph shows 3 attempts, 30 s initial delay, multiplier 2, 10 minute maximum delay, a 1 hour timeout and AllSuccess
 
 #### Scenario: Declared options are registered
 - **WHEN** a task declares 4 attempts, a 15 minute timeout and the label `large-memory`

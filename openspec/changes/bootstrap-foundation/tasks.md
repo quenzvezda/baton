@@ -17,7 +17,7 @@
 ## 3. Infrastructure wiring
 
 - [x] 3.1 Register `NpgsqlDataSource` (pooled) and a dedicated non-pooled connection for `LISTEN` in Orchestrator; verify `/healthz` checks DB connectivity
-- [ ] 3.2 `PostgresFixture` applies migrations once per collection; verify `PostgresSmokeTests` and schema test pass in CI
+- [x] 3.2 `PostgresFixture` applies migrations once per collection; verify `PostgresSmokeTests` and schema test pass in CI
 - [x] 3.3 OpenTelemetry baseline (ASP.NET Core, HttpClient, Npgsql instrumentation; OTLP exporter behind config); verify traces appear in a local collector or console exporter
 
 ## 4. Developer experience

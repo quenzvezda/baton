@@ -18,9 +18,9 @@ ADR-0004 (static definitions), ADR-0006 (idempotency). OQ-02 for platform bounds
 
 ## Exit criteria
 
-- [ ] The design-spec `nightly-sales-report` example compiles and registers
-- [ ] Every startup-validation scenario has a failing-startup test
-- [ ] Golden-file test locks the canonical JSON; reordering declarations keeps the hash
-- [ ] Re-registration paths (insert / no-op / changed hash fails) covered by integration tests
-- [ ] `GET /api/workflows` and `GET /api/workflows/{key}/versions/{version}` live
+- [x] The design-spec `nightly-sales-report` example compiles and registers
+- [x] Every startup-validation scenario has a failing-startup test
+- [x] Golden-file test locks the canonical JSON; reordering declarations keeps the hash
+- [x] Re-registration paths (insert / no-op / changed hash fails) covered by integration tests
+- [x] `GET /api/workflows` and `GET /api/workflows/{key}/versions/{version}` live
 - [ ] Change `add-workflow-definitions` archived ⇒ `openspec/specs/workflow-definitions` exists
