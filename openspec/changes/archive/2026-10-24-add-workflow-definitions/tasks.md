@@ -3,7 +3,7 @@
 ## 1. SDK surface
 
 - [x] 1.1 Finalize `Baton.Abstractions` (builder interfaces, `TaskContext`, `TriggerRule`, `NonRetryableException`); verify the design-spec `NightlySalesReport` example compiles in a test project
-- [ ] 1.2 Document authoring rules in `src/Baton.Definitions/Workflows/README.md`; verify reviewed in PR
+- [x] 1.2 Document authoring rules in `src/Baton.Definitions/Workflows/README.md`; verify reviewed in PR *(reviewed and merged in PR #2)*
 
 ## 2. Graph and validation
 

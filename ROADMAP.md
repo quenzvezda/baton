@@ -12,8 +12,8 @@ Each milestone maps to one OpenSpec change (ADR-0002). Phase-1 changes are alrea
 
 | Milestone | Theme | Requirements | OpenSpec change | Status |
 | --- | --- | --- | --- | --- |
-| [M0](docs/milestones/M0-foundation.md) | Foundation | — (tooling) | `bootstrap-foundation` | Planned |
-| [M1](docs/milestones/M1-workflow-definitions.md) | Workflow definitions | WF-01..08, WF-09 (API) | `add-workflow-definitions` | Planned |
+| [M0](docs/milestones/M0-foundation.md) | Foundation | — (tooling) | `bootstrap-foundation` | Done |
+| [M1](docs/milestones/M1-workflow-definitions.md) | Workflow definitions | WF-01..08, WF-09 (API) | `add-workflow-definitions` | Done |
 | [M2](docs/milestones/M2-host-registry.md) | Host registry, agent protocol, access control | HST-01..05, HST-06 (API), NFR-Security | `add-host-registry` | Planned |
 | [M3](docs/milestones/M3-task-dispatch.md) | Task dispatch & leases | ORC-03, 04, 05, 07, 08, 09, 10 | `add-task-dispatch` | Planned |
 | [M4](docs/milestones/M4-automations-and-run-lifecycle.md) | Automations, triggers & run lifecycle | AUT-01..07, AUT-09, ORC-01, 02, 11 | `add-automations-and-run-lifecycle` | Planned |

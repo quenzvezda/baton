@@ -27,4 +27,4 @@ ADR-0003, ADR-0007, ADR-0010, ADR-0011.
 - [x] Next 3 monthly partitions exist after migration
 - [x] CI green on `main` (build, unit, integration, `openspec validate --all --strict`)
 - [x] README "Getting started" verified on a clean clone *(waived by the owner, 2026-10-24)*
-- [ ] Change `bootstrap-foundation` archived
+- [x] Change `bootstrap-foundation` archived
