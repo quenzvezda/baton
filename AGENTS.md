@@ -77,7 +77,7 @@ A milestone moves through five gates; the owner opens the first and closes the l
    the delta spec when behavior changes). Code starts once the owner agrees.
 2. **Implement on a branch** `m<N>/<change-slug>`, task by task (`.agents/skills/openspec-apply-change`).
    Each task says how it is verified; tick `- [x]` only when that verification passes.
-   - Commit per task or per group of related tasks, the ticks in the same commit.
+   - Commit per task or per group of related tasks, the ticks in the same commit ("Commits" below).
    - Behavior not covered by the change → stop and propose one (`.agents/skills/openspec-propose`).
      Small fixes that don't change specified behavior need no change.
    - Architectural decision (new dependency, new infrastructure, changed invariant below, settling an
@@ -124,6 +124,29 @@ headers, tasks, test names where useful, and PR descriptions.
 - Public SDK (`Baton.Abstractions`) changes are breaking for workflow authors — call them out in the PR.
 - Logging: structured templates (`"Claimed {Count} tasks for {Host}"`) through `[LoggerMessage]`
   source-generated methods (CA1848 is a build error).
+
+## Commits
+
+[Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/): `<type>(<scope>): <summary>`,
+summary in the imperative, lowercase, no trailing period, at most 72 characters.
+
+- Types: `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `build` (packages, SDK, solution), `ci`,
+  `chore` (everything else, including OpenSpec bookkeeping).
+- Scope: the area touched — `sdk`, `domain`, `persistence`, `api`, `orchestrator`, `agent`, `web`,
+  `protocol`, `definitions`, `openspec`, `deps`. Omit it when the commit spans several areas.
+- Body: what and why. Footer: the milestone tasks and requirements, e.g. `Refs: M2 2.1, 2.2; HST-01`.
+- Breaking changes (public SDK, `agent.proto`, REST contract): `!` after the scope and a
+  `BREAKING CHANGE:` footer.
+- PR titles follow the same format. The closing commit of a milestone is
+  `chore(openspec): archive <change-id>`.
+
+```text
+feat(domain): validate workflow graphs at startup
+
+Kahn cycle detection, root presence, key rules and option bounds.
+
+Refs: M1 2.2; WF-03
+```
 
 ## Testing rules
 
