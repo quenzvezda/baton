@@ -71,4 +71,5 @@ Preemption of running tasks, multi-region, runtime authoring before phase 3 (des
 
 - Changing scope of a milestone ⇒ update the milestone doc **and** its OpenSpec change in the same PR.
 - Moving a requirement between phases ⇒ change its priority in the design spec table, note it here.
-- Marking a milestone done ⇒ its change is archived (`openspec archive <id>`) and exit criteria are ticked.
+- Marking a milestone done ⇒ only on the owner's OK: its change is archived (`openspec archive <id>`), exit
+  criteria are ticked and the GitHub milestone is closed (AGENTS.md "How to work").

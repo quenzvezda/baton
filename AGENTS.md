@@ -69,16 +69,28 @@ npx @fission-ai/openspec@1.14.1 archive <change-id>   # when the milestone ships
 
 ## How to work
 
-1. **Find the change.** Work belongs to a milestone and its OpenSpec change. Read `proposal.md`,
-   `design.md`, the delta specs and `tasks.md` before touching code.
-2. **Behavior change not covered by a change?** Stop and propose one (`.agents/skills/openspec-propose`)
-   instead of coding. Small fixes that don't change specified behavior don't need a change.
-3. **Architectural decision?** (new dependency, new infrastructure, changed invariant below, settling an
-   open question) → write an ADR in `docs/adr/` with status *Proposed*. Never silently deviate from an
-   accepted ADR.
-4. **Implement task by task** (`.agents/skills/openspec-apply-change`). Each task says how it is verified;
-   tick `- [x]` only when that verification passes.
-5. **Archive** the change when all tasks and the milestone's exit criteria are done.
+A milestone moves through five gates; the owner opens the first and closes the last.
+
+1. **Discuss before implementing.** Read the milestone doc and its change (`proposal.md`, `design.md`,
+   delta specs, `tasks.md`), then bring the owner the open decisions: gaps in the spec, open questions,
+   defaults that end up in hashes or the public SDK. Record each answer in the change's `design.md` (and
+   the delta spec when behavior changes). Code starts once the owner agrees.
+2. **Implement on a branch** `m<N>/<change-slug>`, task by task (`.agents/skills/openspec-apply-change`).
+   Each task says how it is verified; tick `- [x]` only when that verification passes.
+   - Commit per task or per group of related tasks, the ticks in the same commit.
+   - Behavior not covered by the change → stop and propose one (`.agents/skills/openspec-propose`).
+     Small fixes that don't change specified behavior need no change.
+   - Architectural decision (new dependency, new infrastructure, changed invariant below, settling an
+     open question) → ADR in `docs/adr/` with status *Proposed*. Never silently deviate from an accepted
+     ADR.
+3. **Open the PR** when every task is ticked: linked to the GitHub milestone, every exit criterion ticked
+   except the archive. The change stays in `openspec/changes/` and the GitHub milestone stays open.
+4. **Owner review.** Address review in further commits; wait for the owner's explicit OK.
+5. **Close on the owner's OK**, in this order:
+   - Last commit on the PR branch: `openspec archive <change-id>`, tick the archive exit criterion,
+     mark the milestone done in `ROADMAP.md` and `README.md`.
+   - Close the GitHub milestone (`docs/milestones/README.md` "GitHub milestones").
+   - Merge the PR once CI is green.
 
 Traceability: requirement IDs (`AUT-xx`, `WF-xx`, `ORC-xx`, `HST-xx`, `OBS-xx`, `NFR-*`) appear in spec
 headers, tasks, test names where useful, and PR descriptions.

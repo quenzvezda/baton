@@ -4,12 +4,7 @@ One file per milestone and gate. Each milestone lists its requirement IDs, the O
 specifies it, the ADRs and open questions it depends on, and its **exit criteria** — a milestone is
 done when every exit criterion is ticked and its change is archived.
 
-The same milestones exist on GitHub; link issues and PRs to them. These files are the source of truth:
-`scripts/sync-github-milestones.sh` creates or updates each GitHub milestone from its file (title =
-heading, description = metadata line, closed once every exit criterion is ticked and the OpenSpec change
-is archived). The `milestones` workflow runs it on every push to `main` that touches these files or
-`openspec/changes/`, so edit the files, never the milestones on GitHub. Keep the table below in roadmap
-order; it sets the order milestones are created in.
+Keep the table below in roadmap order.
 
 | File | Phase |
 | --- | --- |
@@ -24,3 +19,25 @@ order; it sets the order milestones are created in.
 | [M7-operability-and-insight.md](M7-operability-and-insight.md) | 2 |
 | [G2-phase-2-exit.md](G2-phase-2-exit.md) | Gate |
 | [M8-extensibility.md](M8-extensibility.md) | 3 |
+
+## GitHub milestones
+
+Every file here has a GitHub milestone, and these files are the source of truth: change the file first,
+then mirror it on GitHub by hand in the same piece of work.
+
+| GitHub field | Value |
+| --- | --- |
+| Title | the file's `# ` heading, verbatim (`M2 — Host registry, agent protocol & access control`) |
+| Description | the file's metadata line without Markdown, then ` · ` and the file path |
+| State | open; closed when the owner approves the milestone and its change is archived (see AGENTS.md "How to work") |
+
+Mirror it when a file is added, its heading or metadata line changes, or the milestone closes. Every PR
+for a milestone is linked to it.
+
+```bash
+gh api 'repos/{owner}/{repo}/milestones?state=all' --jq '.[] | "\(.number) \(.state) \(.title)"'
+gh api 'repos/{owner}/{repo}/milestones' -f title="<heading>" -f description="<metadata> · docs/milestones/<file>"
+gh api -X PATCH 'repos/{owner}/{repo}/milestones/<number>' -f title="<heading>" -f description="<…>"
+gh api -X PATCH 'repos/{owner}/{repo}/milestones/<number>' -f state=closed
+gh pr edit <pr> --milestone "<heading>"
+```
