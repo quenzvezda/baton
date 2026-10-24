@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Baton.Agent": {
+      "commandName": "Project",
+      "environmentVariables": { "DOTNET_ENVIRONMENT": "Development" }
+    }
+  }
+}

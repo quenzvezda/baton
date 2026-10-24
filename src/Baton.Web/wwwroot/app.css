@@ -1,0 +1,5 @@
+:root { color-scheme: light dark; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+body { margin: 0; }
+.topbar { display: flex; gap: 1.5rem; align-items: center; padding: .75rem 1.25rem; border-bottom: 1px solid color-mix(in srgb, currentColor 15%, transparent); }
+.topbar nav { display: flex; gap: 1rem; }
+main { padding: 1.25rem; max-width: 72rem; }

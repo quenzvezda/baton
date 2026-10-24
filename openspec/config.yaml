@@ -1,0 +1,27 @@
+schema: spec-driven
+
+# Project context for OpenSpec workflows (constraints an agent cannot infer from the code).
+context: |
+  Baton is a workflow engine and automations platform: users configure automations that trigger
+  versioned DAG workflows of C# tasks; an orchestrator routes tasks to host groups under limits,
+  priorities and fenced leases. Stack: .NET 10, ASP.NET Core, gRPC, EF Core + Npgsql, PostgreSQL 16+.
+  The reference design is docs/design/design-spec.md; architecture decisions are in docs/adr/.
+  PostgreSQL is the only stateful dependency (ADR-0003) - never propose a broker, cache or second
+  datastore without a new ADR. Every state transition happens inside one Postgres transaction and
+  uses Postgres now() for time. Task execution is at-least-once (ADR-0006).
+  Requirement IDs from the design spec (AUT-xx, WF-xx, ORC-xx, HST-xx, OBS-xx) are the traceability
+  key: each requirement header ends with its ID in parentheses, e.g. "Fenced results (ORC-08)".
+  Requirements that come from non-functional targets use NFR-<attribute>.
+  Roadmap milestones (ROADMAP.md) map one-to-one to changes. Write all artifacts in English.
+
+rules:
+  proposal:
+    - Name the roadmap milestone (M0-M8) and list the requirement IDs in scope
+    - State what is explicitly out of scope, citing the milestone where it lands instead
+  specs:
+    - Keep library, class and table names out of requirements; put them in design.md
+  design:
+    - Link the ADRs that constrain the design; propose a new ADR instead of silently deviating
+  tasks:
+    - Every task states how it is verified (test name, command or observable behavior)
+    - Concurrency-sensitive SQL needs an integration test against Testcontainers Postgres

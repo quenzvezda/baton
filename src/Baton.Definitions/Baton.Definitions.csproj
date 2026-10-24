@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Workflow definitions and task handlers. Shipped as a NuGet package and referenced by API, orchestrator and agents.</Description>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Baton.Abstractions\Baton.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

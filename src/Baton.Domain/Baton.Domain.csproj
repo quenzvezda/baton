@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Pure domain logic: state machines, DAG validation, trigger rules, backoff, priority aging. No I/O.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Baton.Abstractions\Baton.Abstractions.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Baton.Domain.Tests" />
+  </ItemGroup>
+</Project>

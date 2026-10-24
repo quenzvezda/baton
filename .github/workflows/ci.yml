@@ -1,0 +1,40 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: dotnet restore Baton.sln
+      - run: dotnet build Baton.sln --no-restore -c Release
+      - name: Unit tests
+        run: dotnet test tests/Baton.Domain.Tests --no-build -c Release
+      - name: Integration tests (Testcontainers, Docker is available on ubuntu-latest)
+        run: dotnet test tests/Baton.Integration.Tests --no-build -c Release
+
+  openspec:
+    runs-on: ubuntu-latest
+    env:
+      OPENSPEC_TELEMETRY: "0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate specs and changes
+        run: npx --yes @fission-ai/openspec@1.14.1 validate --all --strict --no-interactive

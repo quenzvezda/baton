@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+  <PropertyGroup>
+    <Description>Worker Service that runs on each host: registers, heartbeats, claims tasks, runs handlers, streams logs, reports results.</Description>
+    <UserSecretsId>baton-agent</UserSecretsId>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Baton.Abstractions\Baton.Abstractions.csproj" />
+    <ProjectReference Include="..\Baton.Domain\Baton.Domain.csproj" />
+    <ProjectReference Include="..\Baton.Agent.Protocol\Baton.Agent.Protocol.csproj" />
+    <ProjectReference Include="..\Baton.Definitions\Baton.Definitions.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Grpc.Net.Client" />
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
+  </ItemGroup>
+</Project>

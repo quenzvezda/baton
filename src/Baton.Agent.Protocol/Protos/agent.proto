@@ -1,0 +1,134 @@
+// Agent <-> Orchestrator contract. Design spec §9 (gRPC), ADR-0005 (pull-based agents),
+// ADR-0006 (leases + fencing). Breaking changes require a new package version (v2).
+syntax = "proto3";
+
+package baton.agent.v1;
+
+option csharp_namespace = "Baton.Agent.Protocol.V1";
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+service AgentService {
+  // name, group, labels, slots, version, definition hashes
+  rpc Register  (RegisterRequest)  returns (RegisterReply);
+  // Long-poll up to max_wait (default 20 s); returns 0..free_slots leases.
+  rpc Claim     (ClaimRequest)     returns (ClaimReply);
+  // Renews every lease the host holds; reply lists tasks to stop.
+  rpc Heartbeat (HeartbeatRequest) returns (HeartbeatReply);
+  rpc AppendLogs(stream LogChunk)  returns (AppendLogsReply);
+  // Leased -> Running, fenced by token.
+  rpc Start     (StartRequest)     returns (StartReply);
+  // FAILED_PRECONDITION when the token is stale; the agent discards the result.
+  rpc Complete  (CompleteRequest)  returns (CompleteReply);
+}
+
+// ---------- Register ----------
+message RegisterRequest {
+  string host_name = 1;
+  string host_group = 2;
+  repeated string labels = 3;
+  int32 capacity_slots = 4;
+  string agent_version = 5;
+  repeated string definition_hashes = 6;
+}
+
+message RegisterReply {
+  string host_id = 1;
+  google.protobuf.Duration lease_duration = 2;      // per group, default 60 s
+  google.protobuf.Duration heartbeat_interval = 3;  // default 10 s
+}
+
+// ---------- Claim ----------
+message ClaimRequest {
+  string host_id = 1;
+  int32 free_slots = 2;
+  google.protobuf.Duration max_wait = 3;
+}
+
+message ClaimReply {
+  repeated TaskLease leases = 1;
+}
+
+message TaskLease {
+  string task_run_id = 1;
+  string workflow_run_id = 2;
+  string task_key = 3;
+  string definition_hash = 4;
+  int32  attempt = 5;
+  int64  lease_token = 6;
+  google.protobuf.Duration timeout = 7;
+  bytes  params_json = 8;
+  map<string, bytes> upstream_outputs_json = 9;
+}
+
+message LeaseRef {
+  string task_run_id = 1;
+  int64  lease_token = 2;
+}
+
+// ---------- Heartbeat ----------
+message HeartbeatRequest {
+  string host_id = 1;
+  repeated LeaseRef leases = 2;
+  bool draining = 3;
+}
+
+message HeartbeatReply {
+  // Lease expired or was replaced: stop the handler and discard its result.
+  repeated string lost_task_ids = 1;
+  // cancel_requested is set: cancel the handler's token and report Cancelled.
+  repeated string cancel_task_ids = 2;
+}
+
+// ---------- Logs ----------
+message LogChunk {
+  string task_run_id = 1;
+  int32  attempt = 2;
+  int64  lease_token = 3;
+  repeated LogLine lines = 4;
+}
+
+message LogLine {
+  int32 seq = 1;
+  google.protobuf.Timestamp logged_at = 2;
+  int32 level = 3;      // Microsoft.Extensions.Logging.LogLevel
+  string message = 4;
+}
+
+message AppendLogsReply {
+  int32 accepted = 1;
+}
+
+// ---------- Start / Complete ----------
+message StartRequest {
+  string task_run_id = 1;
+  int64  lease_token = 2;
+}
+
+message StartReply {}
+
+enum TaskOutcome {
+  TASK_OUTCOME_UNSPECIFIED = 0;
+  TASK_OUTCOME_SUCCEEDED = 1;
+  TASK_OUTCOME_FAILED = 2;
+  TASK_OUTCOME_TIMED_OUT = 3;
+  TASK_OUTCOME_CANCELLED = 4;
+}
+
+message TaskError {
+  string type = 1;
+  string message = 2;
+  string stack_trace = 3;
+  bool   retryable = 4;
+}
+
+message CompleteRequest {
+  string task_run_id = 1;
+  int64  lease_token = 2;
+  TaskOutcome outcome = 3;
+  bytes  output_json = 4;   // <= 256 KB
+  TaskError error = 5;
+}
+
+message CompleteReply {}

@@ -1,0 +1,23 @@
+* text=auto eol=lf
+*.sln     text eol=crlf
+*.slnx    text eol=lf
+*.cs      text diff=csharp
+*.razor   text
+*.csproj  text
+*.props   text
+*.proto   text
+*.sql     text
+*.md      text diff=markdown
+*.sh      text eol=lf
+*.cmd     text eol=crlf
+*.bat     text eol=crlf
+*.png     binary
+*.jpg     binary
+*.jpeg    binary
+*.gif     binary
+*.webp    binary
+*.ico     binary
+*.pdf     binary
+*.woff    binary
+*.woff2   binary
+*.zip     binary

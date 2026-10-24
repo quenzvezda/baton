@@ -1,0 +1,136 @@
+# AGENTS.md
+
+Instructions for AI coding agents (and humans) working in this repository. Read this file first,
+then the milestone you are working on (`ROADMAP.md` → `docs/milestones/`).
+
+## Project at a glance
+
+**Baton** — workflow engine & automations platform. Users configure *automations* in a web UI; each one
+triggers a *workflow* (a versioned DAG of C# tasks); an *orchestrator* routes tasks to *host groups* of
+*agents* under limits, priorities and fenced leases. **PostgreSQL is the single source of truth** for
+configuration, run state, the task queue and leases.
+
+Stack: .NET 10 · ASP.NET Core minimal APIs · gRPC · EF Core + Npgsql (+ Dapper on the hot path) ·
+PostgreSQL 16+ · Blazor Server · xUnit + Testcontainers.
+
+Sources of truth, in order:
+1. `openspec/specs/` — behavior that is built (empty until the first change is archived)
+2. `openspec/changes/<id>/` — behavior being built (proposal, design, tasks, delta specs)
+3. `docs/adr/` — why the architecture is the way it is
+4. `docs/design/design-spec.md` — original design spec (2026-10-22); reference, not updated
+
+## Repository map
+
+```text
+Baton.sln
+src/
+  Baton.Abstractions/      public SDK: IWorkflowDefinition, builder, ITaskHandler, TaskContext
+  Baton.Definitions/       workflows + handlers (NuGet package, referenced by API/orchestrator/agent)
+  Baton.Domain/            pure logic: states, DAG validation, trigger rules, backoff, aging — no I/O
+  Baton.Persistence/       EF Core DbContext + migrations; Queue/ = hand-written hot-path SQL
+  Baton.Agent.Protocol/    agent.proto (gRPC contract, package baton.agent.v1)
+  Baton.ControlPlane.Api/  REST API, webhooks, definition registration at startup
+  Baton.Orchestrator/      BackgroundService loops + gRPC AgentService
+  Baton.Agent/             Worker Service on each host
+  Baton.Web/               Blazor Server console (talks to the API only)
+tests/
+  Baton.Domain.Tests/      fast unit tests
+  Baton.Integration.Tests/ Testcontainers Postgres (requires Docker)
+openspec/                  OpenSpec config, specs, changes
+docs/adr/                  Architecture Decision Records
+docs/milestones/           milestone + gate definitions with exit criteria
+.agents/skills/            OpenSpec workflow skills (propose, apply, archive, …)
+```
+
+## Commands
+
+```bash
+docker compose up -d                                  # Postgres 16 on localhost:5432 (baton/baton)
+dotnet restore Baton.sln
+dotnet build Baton.sln -c Release
+dotnet test tests/Baton.Domain.Tests                  # unit
+dotnet test tests/Baton.Integration.Tests             # needs Docker
+dotnet run --project src/Baton.ControlPlane.Api       # http://localhost:5100
+dotnet run --project src/Baton.Orchestrator           # http://localhost:5200 (gRPC + /healthz)
+dotnet run --project src/Baton.Agent
+dotnet run --project src/Baton.Web                    # http://localhost:5300
+
+# EF Core (from repo root)
+dotnet ef migrations add <Name> -p src/Baton.Persistence -s src/Baton.ControlPlane.Api
+dotnet ef database update      -p src/Baton.Persistence -s src/Baton.ControlPlane.Api
+
+# OpenSpec (CLI pinned in CI)
+npx @fission-ai/openspec@1.14.1 list                  # changes in flight + task progress
+npx @fission-ai/openspec@1.14.1 show <change-id>
+npx @fission-ai/openspec@1.14.1 validate --all --strict
+npx @fission-ai/openspec@1.14.1 archive <change-id>   # when the milestone ships
+```
+
+## How to work
+
+1. **Find the change.** Work belongs to a milestone and its OpenSpec change. Read `proposal.md`,
+   `design.md`, the delta specs and `tasks.md` before touching code.
+2. **Behavior change not covered by a change?** Stop and propose one (`.agents/skills/openspec-propose`)
+   instead of coding. Small fixes that don't change specified behavior don't need a change.
+3. **Architectural decision?** (new dependency, new infrastructure, changed invariant below, settling an
+   open question) → write an ADR in `docs/adr/` with status *Proposed*. Never silently deviate from an
+   accepted ADR.
+4. **Implement task by task** (`.agents/skills/openspec-apply-change`). Each task says how it is verified;
+   tick `- [x]` only when that verification passes.
+5. **Archive** the change when all tasks and the milestone's exit criteria are done.
+
+Traceability: requirement IDs (`AUT-xx`, `WF-xx`, `ORC-xx`, `HST-xx`, `OBS-xx`, `NFR-*`) appear in spec
+headers, tasks, test names where useful, and PR descriptions.
+
+## Architecture invariants — do not break
+
+- **Postgres only** (ADR-0003). No message broker, Redis, or second datastore without a new ADR.
+- **One transaction per state transition.** Claim, complete + DAG advance + limit release, reap, admit —
+  each is a single Postgres transaction. No "update then publish" sequences.
+- **Time comes from Postgres `now()`**, never from agent or orchestrator clocks.
+- **Fencing** (ADR-0006). Every agent → orchestrator write after a claim carries the lease token and is
+  rejected (`FAILED_PRECONDITION`) if it doesn't match. Never bypass the token check.
+- **At-least-once.** Handlers must be idempotent; use `TaskContext.IdempotencyKey` (`runId:taskKey`).
+- **Definitions are immutable** (ADR-0004). Any change to a workflow's graph or task options requires
+  bumping `Version`. Never edit a registered `key@version`.
+- **Hot-path SQL is hand-written** in `Baton.Persistence/Queue` (ADR-0007). Don't route claim/heartbeat/
+  complete/reaper through EF Core.
+- **Locks.** `SKIP LOCKED` for row-oriented loops; `pg_try_advisory_xact_lock` (transaction-scoped only) for
+  singleton loops; lock `concurrency_limits` rows in key order (ADR-0008, ADR-0009).
+- **Agents pull, nothing pushes** (ADR-0005). Agents need outbound access only.
+- **No secrets in parameters, logs or the repo.** Parameters reference secrets by name.
+- **Web talks to the API only** — never to the database directly.
+
+## Coding conventions
+
+- File-scoped namespaces; nullable enabled; `async` all the way with `CancellationToken` passed through.
+- Prefer primary constructors and `sealed` classes; records for messages/DTOs.
+- IDs: `Guid.CreateVersion7()` (ADR-0010). Fencing tokens: `lease_token_seq`.
+- Package versions only in `Directory.Packages.props` (central package management). One bump per PR.
+- `Baton.Domain` stays pure: no EF, Npgsql, ASP.NET or I/O references.
+- Public SDK (`Baton.Abstractions`) changes are breaking for workflow authors — call them out in the PR.
+- Logging: structured templates (`"Claimed {Count} tasks for {Host}"`), never string interpolation.
+
+## Testing rules
+
+- Every spec scenario has at least one test that would fail without the behavior.
+- Concurrency-sensitive SQL (claims, fencing, admission, limits) needs an **integration test with
+  concurrent actors** against Testcontainers Postgres — a unit test with mocks is not enough.
+- Domain logic (DAG, trigger rules, backoff, aging) is unit-tested with injected randomness/time.
+- Test names describe behavior: `Stale_token_complete_is_rejected_without_state_change`.
+
+## Definition of done (per PR)
+
+- [ ] Linked to a milestone; OpenSpec change tasks ticked (or "no behavior change" stated)
+- [ ] `dotnet build` clean, `dotnet test` green, `openspec validate --all --strict` green
+- [ ] New/changed behavior covered by tests; concurrency paths by integration tests
+- [ ] ADR added/updated if an architectural decision was made
+- [ ] No secrets, real hostnames or connection strings committed
+
+## Don'ts
+
+- Don't add packages, services or infrastructure that an ADR doesn't cover.
+- Don't change `agent.proto` field numbers or semantics in place — add fields, or create `v2`.
+- Don't edit `docs/design/design-spec.md` to "fix" it; record changes in OpenSpec/ADRs instead.
+- Don't mark OpenSpec tasks done without running their verification.
+- Don't hand-edit `openspec/specs/` for in-flight work — it changes only via archive.

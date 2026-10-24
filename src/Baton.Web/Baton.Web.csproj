@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <Description>Blazor Server UI: automation editor, workflow catalog, runs, hosts, queue dashboard. Talks to the Control Plane API only.</Description>
+  </PropertyGroup>
+</Project>

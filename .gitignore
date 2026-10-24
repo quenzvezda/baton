@@ -1,0 +1,93 @@
+# =============================================================
+# Baton — .gitignore
+# .NET 10 / Visual Studio / Rider / VS Code / Node (OpenSpec CLI)
+# =============================================================
+
+## ---------- Build output ----------
+[Bb]in/
+[Oo]bj/
+# Anchored to the root so source folders such as Logs/ (task logs, OBS-03) are never ignored
+/[Oo]ut/
+/[Ll]og/
+/[Ll]ogs/
+/artifacts/
+publish/
+*.binlog
+*.log
+*.nupkg
+*.snupkg
+# Keep the NuGet packages folder out if someone enables it
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+
+## ---------- Test & coverage ----------
+[Tt]est[Rr]esult*/
+*.trx
+*.coverage
+*.coveragexml
+coverage*.json
+coverage*.xml
+coverage*.info
+coverage-report/
+.coverlet/
+BenchmarkDotNet.Artifacts/
+
+## ---------- User-specific / IDE ----------
+*.user
+*.userosscache
+*.suo
+*.sln.docstates
+*.rsuser
+.vs/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.sln.iml
+*.DotSettings.user
+_ReSharper*/
+*.[Rr]e[Ss]harper
+.fleet/
+
+## ---------- AI assistants (personal settings only; shared config stays tracked) ----------
+.claude/settings.local.json
+CLAUDE.local.md
+
+## ---------- OS ----------
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+## ---------- Secrets & local config (never commit) ----------
+.env
+.env.*
+!.env.example
+appsettings.*.local.json
+appsettings.Local.json
+secrets.json
+*.pfx
+*.p12
+*.key
+*.pem
+!**/testdata/**/*.pem
+
+## ---------- Node (OpenSpec CLI, tooling) ----------
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.pnpm-store/
+
+## ---------- Docker / local data ----------
+.docker-data/
+pgdata/
+docker-compose.override.yml
+
+## ---------- Misc ----------
+*.tmp
+*.bak
+*.swp
+*~
