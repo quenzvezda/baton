@@ -251,7 +251,7 @@ cd baton
 docker compose up -d                        # PostgreSQL 16 on localhost:5432 (dev credentials)
 dotnet tool restore                         # pinned dotnet-ef
 dotnet ef database update -p src/Baton.Persistence -s src/Baton.ControlPlane.Api
-dotnet build Baton.sln
+dotnet build Baton.slnx
 dotnet test tests/Baton.Domain.Tests        # fast unit tests
 dotnet test tests/Baton.Integration.Tests   # spins up Postgres via Testcontainers
 ```

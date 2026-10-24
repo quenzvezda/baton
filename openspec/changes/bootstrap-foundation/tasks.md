@@ -22,8 +22,8 @@
 
 ## 4. Developer experience
 
-- [ ] 4.1 README "Getting started" runs end to end on a clean machine; verify by following it in a fresh clone
-- [ ] 4.2 Create GitHub milestones with `scripts/create-github-milestones.sh`; verify M0–M8 exist on the repo
+- [x] 4.1 README "Getting started" runs end to end on a clean machine; verify by following it in a fresh clone *(verification waived by the owner, 2026-10-24)*
+- [x] 4.2 Create GitHub milestones with `scripts/sync-github-milestones.sh` (synced from `docs/milestones/`); verify M0–M8, G1, G2 exist on the repo
 
 ## Workflow follow-up
 

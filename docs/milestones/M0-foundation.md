@@ -21,10 +21,10 @@ ADR-0003, ADR-0007, ADR-0010, ADR-0011.
 
 ## Exit criteria
 
-- [ ] `dotnet build -c Release` with zero warnings, `TreatWarningsAsErrors=true`
-- [ ] `dotnet ef database update` succeeds on `docker compose` Postgres 16
-- [ ] `Schema_matches_baseline` integration test green in CI
-- [ ] Next 3 monthly partitions exist after migration
-- [ ] CI green on `main` (build, unit, integration, `openspec validate --all --strict`)
-- [ ] README "Getting started" verified on a clean clone
+- [x] `dotnet build -c Release` with zero warnings, `TreatWarningsAsErrors=true`
+- [x] `dotnet ef database update` succeeds on `docker compose` Postgres 16
+- [x] `Schema_matches_baseline` integration test green in CI
+- [x] Next 3 monthly partitions exist after migration
+- [x] CI green on `main` (build, unit, integration, `openspec validate --all --strict`)
+- [x] README "Getting started" verified on a clean clone *(waived by the owner, 2026-10-24)*
 - [ ] Change `bootstrap-foundation` archived

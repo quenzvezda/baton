@@ -4,7 +4,12 @@ One file per milestone and gate. Each milestone lists its requirement IDs, the O
 specifies it, the ADRs and open questions it depends on, and its **exit criteria** — a milestone is
 done when every exit criterion is ticked and its change is archived.
 
-The same milestones exist on GitHub (`scripts/create-github-milestones.sh`); link issues and PRs to them.
+The same milestones exist on GitHub; link issues and PRs to them. These files are the source of truth:
+`scripts/sync-github-milestones.sh` creates or updates each GitHub milestone from its file (title =
+heading, description = metadata line, closed once every exit criterion is ticked and the OpenSpec change
+is archived). The `milestones` workflow runs it on every push to `main` that touches these files or
+`openspec/changes/`, so edit the files, never the milestones on GitHub. Keep the table below in roadmap
+order; it sets the order milestones are created in.
 
 | File | Phase |
 | --- | --- |

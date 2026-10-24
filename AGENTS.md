@@ -22,7 +22,7 @@ Sources of truth, in order:
 ## Repository map
 
 ```text
-Baton.sln
+Baton.slnx
 src/
   Baton.Abstractions/      public SDK: IWorkflowDefinition, builder, ITaskHandler, TaskContext
   Baton.Definitions/       workflows + handlers (NuGet package, referenced by API/orchestrator/agent)
@@ -47,8 +47,8 @@ docs/milestones/           milestone + gate definitions with exit criteria
 
 ```bash
 docker compose up -d                                  # Postgres 16 on localhost:5432 (baton/baton)
-dotnet restore Baton.sln
-dotnet build Baton.sln -c Release
+dotnet restore Baton.slnx
+dotnet build Baton.slnx -c Release
 dotnet test tests/Baton.Domain.Tests                  # unit
 dotnet test tests/Baton.Integration.Tests             # needs Docker
 dotnet run --project src/Baton.ControlPlane.Api       # http://localhost:5100
