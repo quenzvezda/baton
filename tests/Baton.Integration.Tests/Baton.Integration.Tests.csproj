@@ -4,6 +4,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Baton.Persistence\Baton.Persistence.csproj" />
+    <ProjectReference Include="..\..\src\Baton.Orchestrator\Baton.Orchestrator.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
@@ -20,5 +21,9 @@
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Reference schema for Schema_matches_baseline -->
+    <None Include="../../src/Baton.Persistence/Schema/0001_baseline.sql" Link="Schema/0001_baseline.sql" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
