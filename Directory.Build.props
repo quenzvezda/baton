@@ -15,6 +15,7 @@
     <Company>Baton</Company>
     <Product>Baton — Workflow Engine &amp; Automations Platform</Product>
     <Authors>Baton team</Authors>
+    <RepositoryUrl>https://github.com/quenzvezda/baton</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
   </PropertyGroup>

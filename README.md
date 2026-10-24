@@ -8,8 +8,7 @@ Define workflows as versioned C# DAGs, trigger them on a schedule, by hand or by
 replicated orchestrator hand their tasks to pools of worker hosts. It enforces limits and priorities,
 and fenced leases keep a stale worker from ever overwriting a newer result.
 
-<!-- Replace OWNER/baton with the GitHub path once the repository is pushed. -->
-[![CI](https://github.com/OWNER/baton/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/baton/actions/workflows/ci.yml)
+[![CI](https://github.com/quenzvezda/baton/actions/workflows/ci.yml/badge.svg)](https://github.com/quenzvezda/baton/actions/workflows/ci.yml)
 ![.NET 10](https://img.shields.io/badge/.NET-10-512BD4?logo=dotnet&logoColor=white)
 ![C#](https://img.shields.io/badge/C%23-latest-239120?logo=csharp&logoColor=white)
 ![PostgreSQL 16+](https://img.shields.io/badge/PostgreSQL-16%2B-4169E1?logo=postgresql&logoColor=white)
@@ -246,7 +245,7 @@ Full plan, dependency graph and gates: [ROADMAP.md](ROADMAP.md).
 ### Build and test
 
 ```bash
-git clone https://github.com/OWNER/baton.git
+git clone https://github.com/quenzvezda/baton.git
 cd baton
 
 docker compose up -d                        # PostgreSQL 16 on localhost:5432 (dev credentials)
