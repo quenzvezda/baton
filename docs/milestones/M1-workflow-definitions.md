@@ -23,4 +23,4 @@ ADR-0004 (static definitions), ADR-0006 (idempotency). OQ-02 for platform bounds
 - [x] Golden-file test locks the canonical JSON; reordering declarations keeps the hash
 - [x] Re-registration paths (insert / no-op / changed hash fails) covered by integration tests
 - [x] `GET /api/workflows` and `GET /api/workflows/{key}/versions/{version}` live
-- [ ] Change `add-workflow-definitions` archived ⇒ `openspec/specs/workflow-definitions` exists
+- [x] Change `add-workflow-definitions` archived ⇒ `openspec/specs/workflow-definitions` exists

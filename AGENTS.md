@@ -14,7 +14,7 @@ Stack: .NET 10 · ASP.NET Core minimal APIs · gRPC · EF Core + Npgsql (+ Dappe
 PostgreSQL 16+ · Blazor Server · xUnit + Testcontainers.
 
 Sources of truth, in order:
-1. `openspec/specs/` — behavior that is built (empty until the first change is archived)
+1. `openspec/specs/` — behavior that is built (one folder per capability, created by `archive`)
 2. `openspec/changes/<id>/` — behavior being built (proposal, design, tasks, delta specs)
 3. `docs/adr/` — why the architecture is the way it is
 4. `docs/design/design-spec.md` — original design spec (2026-10-22); reference, not updated
