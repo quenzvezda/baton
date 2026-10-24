@@ -54,3 +54,7 @@ dotnet_diagnostic.CA1716.severity = none
 [tests/**.cs]
 # Test names describe behavior with underscores (AGENTS.md "Testing rules")
 dotnet_diagnostic.CA1707.severity = none
+
+[src/Baton.Persistence/Migrations/**.cs]
+# Scaffolded by `dotnet ef`; analyzers and style rules don't apply to generated migrations
+generated_code = true

@@ -3,6 +3,9 @@
     <Description>Trigger loop, admission, DAG advance, dispatch, lease reaping, retry promotion, priority aging + gRPC AgentService.</Description>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="Baton.Integration.Tests" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\Baton.Domain\Baton.Domain.csproj" />
     <ProjectReference Include="..\Baton.Persistence\Baton.Persistence.csproj" />
     <ProjectReference Include="..\Baton.Agent.Protocol\Baton.Agent.Protocol.csproj" />
@@ -11,5 +14,14 @@
   <ItemGroup>
     <PackageReference Include="Grpc.AspNetCore" />
     <PackageReference Include="Cronos" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
+    <PackageReference Include="Npgsql.OpenTelemetry" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- OpenTelemetry baseline, shared as source (M0 task 3.3) -->
+    <Compile Include="../Shared/BatonTelemetry.cs" Link="Shared/BatonTelemetry.cs" />
   </ItemGroup>
 </Project>

@@ -9,16 +9,16 @@
 
 ## 2. Database schema
 
-- [ ] 2.1 Add EF Core entity configurations for config tables (`host_groups`, `hosts`, `automations`, `automation_triggers`, `workflow_definitions`, `concurrency_limits`); verify model builds
-- [ ] 2.2 Create initial migration; raw SQL for partial indexes, `lease_token_seq`, partitioned tables, `fillfactor=80` and `autovacuum_vacuum_scale_factor=0.01` on `task_runs`; verify `dotnet ef database update` against `docker compose` Postgres
-- [ ] 2.3 Integration test `Schema_matches_baseline` compares migrated catalog (tables, indexes, constraints) to `0001_baseline.sql`; verify it passes
-- [ ] 2.4 Choose partition maintenance (pg_partman vs job), implement creating 3 months ahead; verify with an integration test that inserts into next month
+- [x] 2.1 Add EF Core entity configurations for config tables (`host_groups`, `hosts`, `automations`, `automation_triggers`, `workflow_definitions`, `concurrency_limits`); verify model builds
+- [x] 2.2 Create initial migration; raw SQL for partial indexes, `lease_token_seq`, partitioned tables, `fillfactor=80` and `autovacuum_vacuum_scale_factor=0.01` on `task_runs`; verify `dotnet ef database update` against `docker compose` Postgres
+- [x] 2.3 Integration test `Schema_matches_baseline` compares migrated catalog (tables, indexes, constraints) to `0001_baseline.sql`; verify it passes
+- [x] 2.4 Choose partition maintenance (pg_partman vs job), implement creating 3 months ahead; verify with an integration test that inserts into next month
 
 ## 3. Infrastructure wiring
 
-- [ ] 3.1 Register `NpgsqlDataSource` (pooled) and a dedicated non-pooled connection for `LISTEN` in Orchestrator; verify `/healthz` checks DB connectivity
+- [x] 3.1 Register `NpgsqlDataSource` (pooled) and a dedicated non-pooled connection for `LISTEN` in Orchestrator; verify `/healthz` checks DB connectivity
 - [ ] 3.2 `PostgresFixture` applies migrations once per collection; verify `PostgresSmokeTests` and schema test pass in CI
-- [ ] 3.3 OpenTelemetry baseline (ASP.NET Core, HttpClient, Npgsql instrumentation; OTLP exporter behind config); verify traces appear in a local collector or console exporter
+- [x] 3.3 OpenTelemetry baseline (ASP.NET Core, HttpClient, Npgsql instrumentation; OTLP exporter behind config); verify traces appear in a local collector or console exporter
 
 ## 4. Developer experience
 

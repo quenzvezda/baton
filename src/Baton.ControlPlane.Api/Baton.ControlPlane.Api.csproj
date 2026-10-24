@@ -8,4 +8,22 @@
     <ProjectReference Include="..\Baton.Persistence\Baton.Persistence.csproj" />
     <ProjectReference Include="..\Baton.Definitions\Baton.Definitions.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
+    <PackageReference Include="Npgsql.OpenTelemetry" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Startup project for `dotnet ef` (AGENTS.md "Commands") -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <!-- OpenTelemetry baseline, shared as source (M0 task 3.3) -->
+    <Compile Include="../Shared/BatonTelemetry.cs" Link="Shared/BatonTelemetry.cs" />
+  </ItemGroup>
 </Project>

@@ -249,6 +249,8 @@ git clone https://github.com/quenzvezda/baton.git
 cd baton
 
 docker compose up -d                        # PostgreSQL 16 on localhost:5432 (dev credentials)
+dotnet tool restore                         # pinned dotnet-ef
+dotnet ef database update -p src/Baton.Persistence -s src/Baton.ControlPlane.Api
 dotnet build Baton.sln
 dotnet test tests/Baton.Domain.Tests        # fast unit tests
 dotnet test tests/Baton.Integration.Tests   # spins up Postgres via Testcontainers
@@ -265,6 +267,9 @@ dotnet run --project src/Baton.Agent              # outbound only
 dotnet run --project src/Baton.Web                # http://localhost:5300
 ```
 
+Telemetry (traces, metrics, logs) is exported over OTLP only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set,
+e.g. `http://localhost:4317` for a local OpenTelemetry Collector.
+
 ## Repository layout
 
 ```text
@@ -278,6 +283,7 @@ src/
   Baton.Orchestrator/      Background loops + gRPC AgentService
   Baton.Agent/             Worker Service running on each host
   Baton.Web/               Blazor Server console
+  Shared/                  Source linked into server projects (OpenTelemetry baseline)
 tests/
   Baton.Domain.Tests/      Unit tests with injected time and randomness
   Baton.Integration.Tests/ Testcontainers PostgreSQL (schema, queue and concurrency tests)

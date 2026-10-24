@@ -33,6 +33,7 @@ src/
   Baton.Orchestrator/      BackgroundService loops + gRPC AgentService
   Baton.Agent/             Worker Service on each host
   Baton.Web/               Blazor Server console (talks to the API only)
+  Shared/                  source files linked into server projects (OpenTelemetry baseline)
 tests/
   Baton.Domain.Tests/      fast unit tests
   Baton.Integration.Tests/ Testcontainers Postgres (requires Docker)
@@ -55,7 +56,7 @@ dotnet run --project src/Baton.Orchestrator           # http://localhost:5200 (g
 dotnet run --project src/Baton.Agent
 dotnet run --project src/Baton.Web                    # http://localhost:5300
 
-# EF Core (from repo root)
+# EF Core (from repo root; `dotnet tool restore` once for the pinned dotnet-ef)
 dotnet ef migrations add <Name> -p src/Baton.Persistence -s src/Baton.ControlPlane.Api
 dotnet ef database update      -p src/Baton.Persistence -s src/Baton.ControlPlane.Api
 
@@ -109,7 +110,8 @@ headers, tasks, test names where useful, and PR descriptions.
 - Package versions only in `Directory.Packages.props` (central package management). One bump per PR.
 - `Baton.Domain` stays pure: no EF, Npgsql, ASP.NET or I/O references.
 - Public SDK (`Baton.Abstractions`) changes are breaking for workflow authors — call them out in the PR.
-- Logging: structured templates (`"Claimed {Count} tasks for {Host}"`), never string interpolation.
+- Logging: structured templates (`"Claimed {Count} tasks for {Host}"`) through `[LoggerMessage]`
+  source-generated methods (CA1848 is a build error).
 
 ## Testing rules
 
