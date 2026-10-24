@@ -1,5 +1,4 @@
 * text=auto eol=lf
-*.sln     text eol=crlf
 *.slnx    text eol=lf
 *.cs      text diff=csharp
 *.razor   text

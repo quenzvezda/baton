@@ -39,8 +39,9 @@ apply cleanly on PostgreSQL 16); one-command local database; CI as the merge gat
   (ASP.NET Core, HttpClient, Npgsql traces + metrics, logs). OTLP export runs only when
   `OTEL_EXPORTER_OTLP_ENDPOINT` is set; `/healthz` requests are not traced. Agent and Web adopt it when
   they gain behavior (M2/M3, M5).
-- **Solution file.** Keep `Baton.sln` (what the design spec names); `dotnet sln migrate` to `.slnx` is a
-  one-line follow-up if the team prefers the .NET 10 default.
+- **Solution file.** ~~Keep `Baton.sln` (what the design spec names)~~. *Decided (task 1.4):* migrated
+  to `Baton.slnx` with `dotnet sln migrate`, the .NET 10 default (needs Visual Studio 17.13+ or
+  Rider 2024.3+). The design spec's `Baton.sln` is historical.
 - **Connections.** One pooled `NpgsqlDataSource` per process; the orchestrator adds one non-pooled
   connection for `LISTEN` (PgBouncer transaction mode breaks `LISTEN`).
 

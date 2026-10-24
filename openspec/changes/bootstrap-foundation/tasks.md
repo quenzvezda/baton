@@ -5,7 +5,7 @@
 - [x] 1.1 Restore and build `Baton.sln` on .NET 10 SDK; verify `dotnet build -c Release` has zero warnings
 - [x] 1.2 Run `dotnet list package --outdated`, bump pinned versions in `Directory.Packages.props`; verify restore succeeds
 - [x] 1.3 Set `TreatWarningsAsErrors=true` in `Directory.Build.props`; verify CI build stays green
-- [ ] 1.4 Decide `.sln` vs `.slnx` (`dotnet sln migrate`); verify the chosen file opens in VS/Rider and builds in CI
+- [x] 1.4 Decide `.sln` vs `.slnx` (`dotnet sln migrate`); verify the chosen file opens in VS/Rider and builds in CI *(Baton.slnx; opened in Rider, CI run 40101014783)*
 
 ## 2. Database schema
 
@@ -17,13 +17,13 @@
 ## 3. Infrastructure wiring
 
 - [x] 3.1 Register `NpgsqlDataSource` (pooled) and a dedicated non-pooled connection for `LISTEN` in Orchestrator; verify `/healthz` checks DB connectivity
-- [ ] 3.2 `PostgresFixture` applies migrations once per collection; verify `PostgresSmokeTests` and schema test pass in CI
+- [x] 3.2 `PostgresFixture` applies migrations once per collection; verify `PostgresSmokeTests` and schema test pass in CI
 - [x] 3.3 OpenTelemetry baseline (ASP.NET Core, HttpClient, Npgsql instrumentation; OTLP exporter behind config); verify traces appear in a local collector or console exporter
 
 ## 4. Developer experience
 
-- [ ] 4.1 README "Getting started" runs end to end on a clean machine; verify by following it in a fresh clone
-- [ ] 4.2 Create GitHub milestones with `scripts/create-github-milestones.sh`; verify M0–M8 exist on the repo
+- [x] 4.1 README "Getting started" runs end to end on a clean machine; verify by following it in a fresh clone *(verification waived by the owner, 2026-10-24)*
+- [x] 4.2 Create GitHub milestones with `scripts/sync-github-milestones.sh` (synced from `docs/milestones/`); verify M0–M8, G1, G2 exist on the repo
 
 ## Workflow follow-up
 

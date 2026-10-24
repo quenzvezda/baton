@@ -20,8 +20,8 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
-      - run: dotnet restore Baton.sln
-      - run: dotnet build Baton.sln --no-restore -c Release
+      - run: dotnet restore Baton.slnx
+      - run: dotnet build Baton.slnx --no-restore -c Release
       - name: Unit tests
         run: dotnet test tests/Baton.Domain.Tests --no-build -c Release
       - name: Integration tests (Testcontainers, Docker is available on ubuntu-latest)

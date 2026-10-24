@@ -1,0 +1,1 @@
+{"type":"object","properties":{"region":{"type":"string"},"reportDate":{"type":["string","null"],"format":"date"},"recipients":{"type":"array","items":{"type":"string"}}},"required":["region","reportDate","recipients"]}

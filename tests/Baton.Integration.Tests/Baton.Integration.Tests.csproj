@@ -5,6 +5,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Baton.Persistence\Baton.Persistence.csproj" />
     <ProjectReference Include="..\..\src\Baton.Orchestrator\Baton.Orchestrator.csproj" />
+    <ProjectReference Include="..\..\src\Baton.ControlPlane.Api\Baton.ControlPlane.Api.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
@@ -24,6 +25,8 @@
   </ItemGroup>
   <ItemGroup>
     <!-- Reference schema for Schema_matches_baseline -->
+    <!-- The design-spec example, shared with Domain.Tests so both test the same code (M1 exit criterion) -->
+    <Compile Include="../Baton.Domain.Tests/Samples/NightlySalesReport.cs" Link="Samples/NightlySalesReport.cs" />
     <None Include="../../src/Baton.Persistence/Schema/0001_baseline.sql" Link="Schema/0001_baseline.sql" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

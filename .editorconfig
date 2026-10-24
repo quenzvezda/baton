@@ -8,15 +8,11 @@ trim_trailing_whitespace = true
 indent_style = space
 indent_size = 4
 
-[*.{json,yml,yaml,props,targets,csproj,xml,razor,proto}]
+[*.{json,yml,yaml,props,targets,csproj,slnx,xml,razor,proto}]
 indent_size = 2
 
 [*.md]
 trim_trailing_whitespace = false
-
-[*.sln]
-end_of_line = crlf
-indent_style = tab
 
 [*.cs]
 # Namespaces & usings
