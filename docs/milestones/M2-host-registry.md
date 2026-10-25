@@ -23,4 +23,4 @@ OQ-05 (multi-group hosts), OQ-06 (where agents run).
 - [x] Drain/undrain and group move work end to end
 - [x] Anonymous 401, Viewer 403 on writes, Admin-only group management — covered by API tests
 - [x] Every Control Plane endpoint has an authorization policy (inventory test)
-- [ ] Change `add-host-registry` archived
+- [x] Change `add-host-registry` archived
