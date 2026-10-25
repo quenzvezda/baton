@@ -13,14 +13,14 @@
 ## 3. Host groups
 
 - [x] 3.1 Host-group CRUD endpoints with Admin role and limit-row upsert (HST-01); verify API tests for create, duplicate (409), delete-in-use and 403
-- [ ] 3.2 Agent credential issuance/revocation per group (NFR-Security); verify integration test: revoked token is rejected
+- [x] 3.2 Agent credential issuance/revocation per group (NFR-Security); verify integration test: revoked token is rejected
 
 ## 4. Agent protocol
 
-- [ ] 4.1 `AgentService.Register` with create-or-update by name (HST-02); verify integration tests for first registration, re-registration and unknown group
-- [ ] 4.2 gRPC auth interceptor validating group-scoped credentials; verify tests for missing and wrong-group credentials
-- [ ] 4.3 `AgentService.Heartbeat` updating `last_heartbeat_at` from `now()` and returning drain state (HST-03, HST-04); verify integration test that `last_heartbeat_at` comes from server time, not the agent
-- [ ] 4.4 Status derived from heartbeat age for inventory and dispatch eligibility; the persisted sweep is M3's reaper (design.md decision 9) (HST-03); verify integration test: no heartbeat 31 s ⇒ Offline and not eligible
+- [x] 4.1 `AgentService.Register` with create-or-update by name (HST-02); verify integration tests for first registration, re-registration and unknown group
+- [x] 4.2 gRPC auth interceptor validating group-scoped credentials; verify tests for missing and wrong-group credentials
+- [x] 4.3 `AgentService.Heartbeat` updating `last_heartbeat_at` from `now()` and returning drain state (HST-03, HST-04); verify integration test that `last_heartbeat_at` comes from server time, not the agent
+- [x] 4.4 Status derived from heartbeat age for inventory and dispatch eligibility; the persisted sweep is M3's reaper (design.md decision 9) (HST-03); verify integration test: no heartbeat 31 s ⇒ Offline and not eligible
 
 ## 5. Agent
 

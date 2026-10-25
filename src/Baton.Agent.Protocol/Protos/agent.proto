@@ -9,6 +9,7 @@ option csharp_namespace = "Baton.Agent.Protocol.V1";
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 
+// Every call carries `authorization: Bearer <token>`, a credential scoped to one host group (ADR-0013).
 service AgentService {
   // name, group, labels, slots, version, definition hashes
   rpc Register  (RegisterRequest)  returns (RegisterReply);
@@ -37,6 +38,8 @@ message RegisterReply {
   string host_id = 1;
   google.protobuf.Duration lease_duration = 2;      // per group, default 60 s
   google.protobuf.Duration heartbeat_interval = 3;  // default 10 s
+  // An operator drained the host (HST-04): claim nothing, finish running tasks.
+  bool draining = 4;
 }
 
 // ---------- Claim ----------
@@ -71,6 +74,7 @@ message LeaseRef {
 message HeartbeatRequest {
   string host_id = 1;
   repeated LeaseRef leases = 2;
+  // The agent is shutting down: it claims nothing and finishes its running tasks.
   bool draining = 3;
 }
 
@@ -79,6 +83,8 @@ message HeartbeatReply {
   repeated string lost_task_ids = 1;
   // cancel_requested is set: cancel the handler's token and report Cancelled.
   repeated string cancel_task_ids = 2;
+  // An operator drained the host (HST-04); false again after undrain.
+  bool draining = 3;
 }
 
 // ---------- Logs ----------
