@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Baton.ControlPlane.Api.Security;
 using Baton.Persistence;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
@@ -27,8 +28,8 @@ public static class CatalogEndpoints
     public static IEndpointRouteBuilder MapWorkflowCatalog(this IEndpointRouteBuilder app)
     {
         var workflows = app.MapGroup("/api/workflows");
-        workflows.MapGet("/", ListLatestAsync);
-        workflows.MapGet("/{key}/versions/{version:int}", GetVersionAsync);
+        workflows.MapGet("/", ListLatestAsync).RequireAuthorization(BatonRoles.Viewer);
+        workflows.MapGet("/{key}/versions/{version:int}", GetVersionAsync).RequireAuthorization(BatonRoles.Viewer);
         return app;
     }
 

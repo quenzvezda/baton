@@ -7,12 +7,12 @@
 
 ## 2. Access control
 
-- [ ] 2.1 OIDC sign-in and role mapping (Viewer/Operator/Admin) from IdP claims (NFR-Security); verify API tests: anonymous 401, Viewer read 200, Viewer write 403
-- [ ] 2.2 Authorization policies applied to all Control Plane endpoints incl. M1 catalog; verify an endpoint-inventory test fails when an endpoint has no policy
+- [x] 2.1 OIDC sign-in and role mapping (Viewer/Operator/Admin) from IdP claims (NFR-Security); verify API tests: anonymous 401, Viewer read 200, Viewer write 403
+- [x] 2.2 Authorization policies applied to all Control Plane endpoints incl. M1 catalog; verify an endpoint-inventory test fails when an endpoint has no policy
 
 ## 3. Host groups
 
-- [ ] 3.1 Host-group CRUD endpoints with Admin role and limit-row upsert (HST-01); verify API tests for create, duplicate (409), delete-in-use and 403
+- [x] 3.1 Host-group CRUD endpoints with Admin role and limit-row upsert (HST-01); verify API tests for create, duplicate (409), delete-in-use and 403
 - [ ] 3.2 Agent credential issuance/revocation per group (NFR-Security); verify integration test: revoked token is rejected
 
 ## 4. Agent protocol
@@ -29,8 +29,8 @@
 
 ## 6. Inventory and operations
 
-- [ ] 6.1 `POST /api/hosts/{id}/drain|undrain`, group move and removal of offline hosts (HST-04, HST-05); verify API tests
-- [ ] 6.2 `GET /api/hosts` inventory (HST-06); verify API test with seeded leases
+- [x] 6.1 `POST /api/hosts/{id}/drain|undrain`, group move and removal of offline hosts (HST-04, HST-05); verify API tests
+- [x] 6.2 `GET /api/hosts` inventory (HST-06); verify API test with seeded leases
 
 ## Workflow follow-up
 
