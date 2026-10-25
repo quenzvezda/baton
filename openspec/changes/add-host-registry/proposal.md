@@ -35,4 +35,5 @@ None.
 ## Impact
 
 `Baton.Agent.Protocol`, `Baton.Orchestrator` (AgentService), `Baton.Agent`, `Baton.ControlPlane.Api`,
-`Baton.Persistence` (`host_groups`, `hosts`, `concurrency_limits`). ADR-0005, ADR-0013 (must be accepted).
+`Baton.Persistence` (`host_groups`, `hosts`, `concurrency_limits`). ADR-0005, ADR-0013 and ADR-0014 (accepted 2026-10-25). New table `agent_credentials`; additive
+`agent.proto` fields; REST additions listed in design.md.

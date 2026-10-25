@@ -13,12 +13,12 @@ HST-01, HST-02, HST-03, HST-04, HST-05, HST-06 (API), NFR-Security (OIDC + roles
 
 ## ADRs / open questions
 
-ADR-0005 (pull-based gRPC), ADR-0009 (limit rows), **ADR-0013 must be Accepted** (agent auth).
+ADR-0005 (pull-based gRPC), ADR-0009 (limit rows), ADR-0013 (agent auth, Accepted), ADR-0014 (OIDC for people, Accepted).
 OQ-05 (multi-group hosts), OQ-06 (where agents run).
 
 ## Exit criteria
 
-- [ ] ADR-0013 Accepted; OQ-05 and OQ-06 answered
+- [x] ADR-0013 Accepted; OQ-05 and OQ-06 answered
 - [ ] An agent registers, heartbeats, shows Online, and goes Offline 30 s after it stops
 - [ ] Drain/undrain and group move work end to end
 - [ ] Anonymous 401, Viewer 403 on writes, Admin-only group management — covered by API tests
