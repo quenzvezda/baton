@@ -24,8 +24,8 @@
 
 ## 5. Agent
 
-- [ ] 5.1 `AgentOptions`, `AgentClient` with resilience pipeline, register + heartbeat loop; verify agent registers against a locally running orchestrator (manual check documented in README)
-- [ ] 5.2 Drain handling and graceful shutdown (stop claiming, finish running work); verify unit test on the worker state machine
+- [x] 5.1 `AgentOptions`, `AgentClient` with resilience pipeline, register + heartbeat loop; verify agent registers against a locally running orchestrator (manual check documented in README)
+- [x] 5.2 Drain handling and graceful shutdown (stop claiming, finish running work); verify unit test on the worker state machine
 
 ## 6. Inventory and operations
 
