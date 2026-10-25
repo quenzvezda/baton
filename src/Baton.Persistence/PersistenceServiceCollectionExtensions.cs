@@ -1,4 +1,6 @@
 using Baton.Persistence.Definitions;
+using Baton.Persistence.Hosts;
+using Baton.Persistence.Queue;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
@@ -23,6 +25,8 @@ public static class PersistenceServiceCollectionExtensions
         services.AddDbContext<BatonDbContext>((sp, options) =>
             options.UseNpgsql(sp.GetRequiredService<NpgsqlDataSource>()));
         services.AddSingleton<WorkflowRegistrar>();
+        services.AddSingleton<AgentRegistry>();
+        services.AddSingleton<HostDirectory>();
         return services;
     }
 

@@ -15,6 +15,7 @@ public sealed class BatonDbContext(DbContextOptions<BatonDbContext> options) : D
     public DbSet<WorkflowDefinitionEntity> WorkflowDefinitions => Set<WorkflowDefinitionEntity>();
     public DbSet<HostGroupEntity> HostGroups => Set<HostGroupEntity>();
     public DbSet<HostEntity> Hosts => Set<HostEntity>();
+    public DbSet<AgentCredentialEntity> AgentCredentials => Set<AgentCredentialEntity>();
     public DbSet<AutomationEntity> Automations => Set<AutomationEntity>();
     public DbSet<AutomationTriggerEntity> AutomationTriggers => Set<AutomationTriggerEntity>();
     public DbSet<ConcurrencyLimitEntity> ConcurrencyLimits => Set<ConcurrencyLimitEntity>();

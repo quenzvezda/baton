@@ -82,10 +82,14 @@ public sealed class SchemaTests(PostgresFixture pg)
         var builder = new NpgsqlConnectionStringBuilder(pg.ConnectionString) { Database = BaselineDatabase };
         await using var baseline = NpgsqlDataSource.Create(builder.ConnectionString);
 
-        var path = Path.Combine(AppContext.BaseDirectory, "Schema", "0001_baseline.sql");
-        var sql = await File.ReadAllTextAsync(path) + BaselineAdditions;
-        await using (var cmd = baseline.CreateCommand(sql))
+        // 0001_baseline.sql is the design-spec schema; later files are the reference for later migrations.
+        var files = Directory.GetFiles(Path.Combine(AppContext.BaseDirectory, "Schema"), "*.sql").Order(StringComparer.Ordinal);
+        foreach (var path in files)
         {
+            var sql = await File.ReadAllTextAsync(path);
+            if (Path.GetFileName(path) == "0001_baseline.sql")
+                sql += BaselineAdditions;
+            await using var cmd = baseline.CreateCommand(sql);
             await cmd.ExecuteNonQueryAsync();
         }
 

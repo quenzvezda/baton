@@ -16,6 +16,7 @@ internal sealed class HostConfiguration : IEntityTypeConfiguration<HostEntity>
         builder.HasKey(h => h.Id);
         builder.Property(h => h.Labels).HasSuppliedDefault("'{}'");
         builder.Property(h => h.RegisteredAt).HasDefaultValueSql("now()");
+        builder.Property(h => h.DrainRequested).HasSuppliedDefault("false");
 
         builder.HasIndex(h => h.Name).IsUnique().HasDatabaseName("hosts_name_key");
 
@@ -23,5 +24,10 @@ internal sealed class HostConfiguration : IEntityTypeConfiguration<HostEntity>
             .WithMany()
             .HasForeignKey(h => h.HostGroupId)
             .OnDelete(DeleteBehavior.NoAction);
+
+        builder.HasOne<AgentCredentialEntity>()
+            .WithMany()
+            .HasForeignKey(h => h.CredentialId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

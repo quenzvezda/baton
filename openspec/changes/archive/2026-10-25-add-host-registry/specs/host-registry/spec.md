@@ -22,6 +22,10 @@ Admins SHALL be able to create, edit and delete host groups with a unique name, 
 - **WHEN** an Admin deletes a group that still has hosts or automations
 - **THEN** the request is rejected and the group is unchanged
 
+#### Scenario: Viewer reads groups
+- **WHEN** a Viewer lists host groups
+- **THEN** every group is returned with its limits
+
 #### Scenario: Non-admin cannot manage groups
 - **WHEN** an Operator tries to create a host group
 - **THEN** the request is rejected with 403 Forbidden
@@ -48,9 +52,28 @@ Every agent call SHALL be authenticated with a credential bound to one host grou
 - **WHEN** an agent calls the agent API without a credential
 - **THEN** the call is rejected as unauthenticated and nothing is recorded
 
+#### Scenario: Revoked credential
+- **WHEN** an Admin revokes a credential and an agent then calls the agent API with it
+- **THEN** the call is rejected as unauthenticated and nothing is recorded
+
 #### Scenario: Credential for another group
 - **WHEN** an agent with a credential for group `etl` registers into group `gpu`
 - **THEN** the call is rejected as permission denied
+
+#### Scenario: Another group's credential cannot take over a host
+- **WHEN** host `gpu-01` is registered in group `gpu` and an agent with a credential for `etl` registers as `gpu-01`
+- **THEN** the call is rejected as permission denied and `gpu-01` is unchanged
+
+### Requirement: Agent credential administration (NFR-Security)
+Admins SHALL be able to issue named credentials for a host group, list them without their secret, and revoke them; a credential's secret SHALL be shown only when it is issued and SHALL be stored only as a hash.
+
+#### Scenario: Issue a credential
+- **WHEN** an Admin issues credential `etl-agents` for group `etl`
+- **THEN** the response contains the secret once, and later listings show the credential without it
+
+#### Scenario: Non-admin cannot issue credentials
+- **WHEN** an Operator issues a credential for group `etl`
+- **THEN** the request is rejected with 403 Forbidden
 
 ### Requirement: Heartbeat liveness (HST-03)
 Agents SHALL heartbeat every 10 seconds, and a host with no heartbeat for 30 seconds SHALL be treated as Offline and receive no new work.
@@ -74,6 +97,14 @@ Operators SHALL be able to drain a host so that it finishes its running tasks an
 - **WHEN** an Operator undrains a draining host
 - **THEN** the host becomes Online and eligible for new tasks
 
+#### Scenario: Drain survives an outage
+- **WHEN** a drained host goes Offline and later heartbeats again
+- **THEN** it is Draining, not Online, until an Operator undrains it
+
+#### Scenario: Viewer cannot drain
+- **WHEN** a Viewer drains a host
+- **THEN** the response is 403 Forbidden and the host is unchanged
+
 ### Requirement: Single group membership (HST-05)
 Each host SHALL belong to exactly one host group, and moving a host to another group SHALL take effect on the host's next claim.
 
@@ -81,6 +112,21 @@ Each host SHALL belong to exactly one host group, and moving a host to another g
 - **WHEN** an Admin moves host `etl-01` from `etl` to `gpu`
 - **THEN** its next claim only receives tasks routed to `gpu`
 - **AND** tasks it already holds are unaffected
+
+#### Scenario: Restart after a move
+- **WHEN** host `etl-01` was moved to `gpu` and its agent restarts and registers into `etl` with its `etl` credential
+- **THEN** the host stays in `gpu`
+
+### Requirement: Removing offline hosts (HST-06)
+Admins SHALL be able to remove a host that is Offline from the inventory; removing a host that is Online or Draining SHALL be rejected.
+
+#### Scenario: Remove an offline host
+- **WHEN** an Admin removes host `etl-07`, which has been Offline for a day
+- **THEN** it no longer appears in the inventory
+
+#### Scenario: Remove a live host
+- **WHEN** an Admin removes host `etl-01` while it heartbeats
+- **THEN** the request is rejected with 409 Conflict and the host is unchanged
 
 ### Requirement: Host inventory (HST-06)
 The control plane SHALL return every host with its group, status, slots used and total, current tasks and last heartbeat time.

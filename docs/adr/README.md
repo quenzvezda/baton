@@ -28,4 +28,5 @@ Statuses: `Proposed` · `Accepted` · `Rejected` · `Deprecated` · `Superseded 
 | [0010](0010-uuidv7-identifiers.md) | Time-ordered UUIDv7 identifiers | Accepted | §7, §8 |
 | [0011](0011-history-partitioning-and-retention.md) | Monthly partitions and 90-day retention for history | Accepted | §3, §7 |
 | [0012](0012-web-ui-framework.md) | Web UI framework | **Proposed** | §4, OQ-09 |
-| [0013](0013-agent-authentication.md) | Agent authentication | **Proposed** | §3 |
+| [0013](0013-agent-authentication.md) | Agent authentication with group-scoped bearer tokens | Accepted | §3 |
+| [0014](0014-people-authentication-with-oidc.md) | People authenticate with OIDC bearer tokens | Accepted | §3 |

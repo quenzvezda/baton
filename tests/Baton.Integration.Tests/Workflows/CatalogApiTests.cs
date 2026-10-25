@@ -1,12 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using Baton.ControlPlane.Api.Workflows;
+using Baton.ControlPlane.Api.Security;
 using Baton.Integration.Tests.Infrastructure;
-using Baton.Persistence;
 using Baton.Persistence.Definitions;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
 
 namespace Baton.Integration.Tests.Workflows;
 
@@ -14,25 +11,20 @@ namespace Baton.Integration.Tests.Workflows;
 [Collection(PostgresCollectionDefinition.Name)]
 public sealed class CatalogApiTests(PostgresFixture pg) : IAsyncLifetime
 {
-    private static readonly HttpClient Http = new();
-
-    private WebApplication _app = null!;
-    private Uri _baseAddress = null!;
+    private ControlPlaneHost _api = null!;
+    private HttpClient Http { get; set; } = null!;
 
     public async Task InitializeAsync()
     {
-        var builder = WebApplication.CreateSlimBuilder();
-        builder.WebHost.UseUrls("http://127.0.0.1:0");
-        builder.Services.AddBatonPersistence(pg.ConnectionString);
-
-        _app = builder.Build();
-        _app.MapWorkflowCatalog();
-        await _app.StartAsync();
-
-        _baseAddress = new Uri(_app.Urls.First());
+        _api = await ControlPlaneHost.StartAsync(pg);
+        Http = _api.Client(BatonRoles.Viewer);
     }
 
-    public async Task DisposeAsync() => await _app.DisposeAsync();
+    public async Task DisposeAsync()
+    {
+        Http.Dispose();
+        await _api.DisposeAsync();
+    }
 
     [Fact]
     public async Task List_shows_the_latest_version_of_each_workflow()
@@ -82,7 +74,7 @@ public sealed class CatalogApiTests(PostgresFixture pg) : IAsyncLifetime
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    private Uri Url(string path) => new(_baseAddress, path);
+    private static Uri Url(string path) => new(path, UriKind.Relative);
 
     private async Task<string> RegisterVersionsAsync(string prefix, params int[] versions)
     {

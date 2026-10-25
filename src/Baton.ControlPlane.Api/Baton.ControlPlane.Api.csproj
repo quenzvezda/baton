@@ -1,7 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
     <Description>REST control plane: automations, triggers, host groups, Run now, webhook intake; registers definitions at startup.</Description>
+    <!-- `dotnet user-jwts` keeps the local signing key here (ADR-0014, README "Getting started") -->
+    <UserSecretsId>baton-control-plane-api</UserSecretsId>
   </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Baton.Integration.Tests" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Baton.Abstractions\Baton.Abstractions.csproj" />
     <ProjectReference Include="..\Baton.Domain\Baton.Domain.csproj" />
@@ -9,6 +14,7 @@
     <ProjectReference Include="..\Baton.Definitions\Baton.Definitions.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
     <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
