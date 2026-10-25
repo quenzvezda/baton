@@ -19,8 +19,8 @@ OQ-05 (multi-group hosts), OQ-06 (where agents run).
 ## Exit criteria
 
 - [x] ADR-0013 Accepted; OQ-05 and OQ-06 answered
-- [ ] An agent registers, heartbeats, shows Online, and goes Offline 30 s after it stops
-- [ ] Drain/undrain and group move work end to end
-- [ ] Anonymous 401, Viewer 403 on writes, Admin-only group management — covered by API tests
-- [ ] Every Control Plane endpoint has an authorization policy (inventory test)
+- [x] An agent registers, heartbeats, shows Online, and goes Offline 30 s after it stops
+- [x] Drain/undrain and group move work end to end
+- [x] Anonymous 401, Viewer 403 on writes, Admin-only group management — covered by API tests
+- [x] Every Control Plane endpoint has an authorization policy (inventory test)
 - [ ] Change `add-host-registry` archived

@@ -74,6 +74,9 @@ without any orchestrator-local state; any orchestrator replica can serve any age
   when given; `lease_seconds` is 30–3600 (default 60).
 - The agent's lifecycle (registering → online ⇄ draining → stopping) is a pure state machine in
   `Baton.Domain/Hosts`, unit-tested; the worker in `Baton.Agent` drives it.
+- Without TLS, Kestrel serves HTTP/2 only on an endpoint limited to HTTP/2 (no ALPN), so in
+  Development the orchestrator serves `/healthz` on 5200 and gRPC on 5201; behind TLS one endpoint
+  serves both. Found during the manual agent check (task 5.1, 2026-10-25).
 - Retries use a Polly pipeline from `Microsoft.Extensions.Resilience` (via
   `Microsoft.Extensions.Http.Resilience`): exponential backoff with jitter on transient gRPC status
   codes; registration retries any failure (unknown group, bad token) with the same backoff.

@@ -263,9 +263,35 @@ Start each in its own terminal:
 
 ```bash
 dotnet run --project src/Baton.ControlPlane.Api   # http://localhost:5100/healthz
-dotnet run --project src/Baton.Orchestrator       # http://localhost:5200/healthz (gRPC on the same port)
+dotnet run --project src/Baton.Orchestrator       # http://localhost:5200/healthz, gRPC on :5201 (h2c, dev only)
 dotnet run --project src/Baton.Agent              # outbound only
 dotnet run --project src/Baton.Web                # http://localhost:5300
+```
+
+Without TLS, HTTP/2 needs its own endpoint, so in Development the orchestrator serves gRPC on port 5201.
+Behind TLS one endpoint serves both.
+
+### Sign in and connect an agent locally
+
+The API accepts bearer tokens from any OIDC provider ([ADR-0014](docs/adr/0014-people-authentication-with-oidc.md)).
+Locally, `dotnet user-jwts` signs them; `appsettings.Development.json` maps its `role` claim to Baton roles.
+Agents authenticate with a token issued for their host group ([ADR-0013](docs/adr/0013-agent-authentication.md)).
+
+```bash
+# 1. An Admin token for the API (the key lands in your user secrets, not the repo)
+dotnet user-jwts create --project src/Baton.ControlPlane.Api --role Admin --output token
+
+# 2. Create a host group and issue an agent token for it ($JWT = the token above)
+curl -H "Authorization: Bearer $JWT" -H "Content-Type: application/json"      -d '{"name":"default","maxConcurrentTasks":8}' http://localhost:5100/api/host-groups
+curl -H "Authorization: Bearer $JWT" -H "Content-Type: application/json"      -d '{"name":"dev-agents"}' http://localhost:5100/api/host-groups/<group-id>/agent-tokens
+
+# 3. Give the agent its token (shown once) and start it
+dotnet user-secrets set Agent:Token <token> --project src/Baton.Agent
+dotnet run --project src/Baton.Agent
+
+# 4. The host is Online; drain/undrain it, stop the agent and it shows Draining, then Offline 30 s later
+curl -H "Authorization: Bearer $JWT" http://localhost:5100/api/hosts
+curl -X POST -H "Authorization: Bearer $JWT" http://localhost:5100/api/hosts/<host-id>/drain
 ```
 
 Telemetry (traces, metrics, logs) is exported over OTLP only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set,
