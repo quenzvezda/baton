@@ -22,6 +22,51 @@ namespace Baton.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Baton.Persistence.Entities.AgentCredentialEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("HostGroupId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("host_group_id");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<byte[]>("TokenHash")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("token_hash");
+
+                    b.HasKey("Id")
+                        .HasName("agent_credentials_pkey");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("agent_credentials_token_hash_key");
+
+                    b.HasIndex("HostGroupId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("agent_credentials_host_group_id_name_key");
+
+                    b.ToTable("agent_credentials", (string)null);
+                });
+
             modelBuilder.Entity("Baton.Persistence.Entities.AutomationEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -230,10 +275,19 @@ namespace Baton.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("capacity_slots");
 
+                    b.Property<Guid?>("CredentialId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("credential_id");
+
                     b.PrimitiveCollection<string[]>("DefinitionHashes")
                         .IsRequired()
                         .HasColumnType("text[]")
                         .HasColumnName("definition_hashes");
+
+                    b.Property<bool>("DrainRequested")
+                        .HasColumnType("boolean")
+                        .HasColumnName("drain_requested")
+                        .HasDefaultValueSql("false");
 
                     b.Property<Guid>("HostGroupId")
                         .HasColumnType("uuid")
@@ -379,6 +433,16 @@ namespace Baton.Persistence.Migrations
                     b.ToTable("workflow_definitions", (string)null);
                 });
 
+            modelBuilder.Entity("Baton.Persistence.Entities.AgentCredentialEntity", b =>
+                {
+                    b.HasOne("Baton.Persistence.Entities.HostGroupEntity", null)
+                        .WithMany()
+                        .HasForeignKey("HostGroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("agent_credentials_host_group_id_fkey");
+                });
+
             modelBuilder.Entity("Baton.Persistence.Entities.AutomationEntity", b =>
                 {
                     b.HasOne("Baton.Persistence.Entities.HostGroupEntity", null)
@@ -401,6 +465,12 @@ namespace Baton.Persistence.Migrations
 
             modelBuilder.Entity("Baton.Persistence.Entities.HostEntity", b =>
                 {
+                    b.HasOne("Baton.Persistence.Entities.AgentCredentialEntity", null)
+                        .WithMany()
+                        .HasForeignKey("CredentialId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("hosts_credential_id_fkey");
+
                     b.HasOne("Baton.Persistence.Entities.HostGroupEntity", null)
                         .WithMany()
                         .HasForeignKey("HostGroupId")

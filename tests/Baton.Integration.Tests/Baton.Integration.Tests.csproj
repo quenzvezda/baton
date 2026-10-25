@@ -8,6 +8,7 @@
     <ProjectReference Include="..\..\src\Baton.ControlPlane.Api\Baton.ControlPlane.Api.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Grpc.Net.Client" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio">
@@ -27,6 +28,6 @@
     <!-- Reference schema for Schema_matches_baseline -->
     <!-- The design-spec example, shared with Domain.Tests so both test the same code (M1 exit criterion) -->
     <Compile Include="../Baton.Domain.Tests/Samples/NightlySalesReport.cs" Link="Samples/NightlySalesReport.cs" />
-    <None Include="../../src/Baton.Persistence/Schema/0001_baseline.sql" Link="Schema/0001_baseline.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../src/Baton.Persistence/Schema/*.sql" Link="Schema/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

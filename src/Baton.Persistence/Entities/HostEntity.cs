@@ -19,6 +19,12 @@ public sealed class HostEntity
 
     public DateTimeOffset LastHeartbeatAt { get; set; }
 
+    /// <summary>Operator drain (HST-04), kept apart from liveness so it survives an outage.</summary>
+    public bool DrainRequested { get; set; }
+
+    /// <summary>The credential the agent registered with (ADR-0013); <c>null</c> once it is deleted.</summary>
+    public Guid? CredentialId { get; set; }
+
     /// <summary>Set by Postgres <c>now()</c> on insert.</summary>
     public DateTimeOffset RegisteredAt { get; set; }
 }
