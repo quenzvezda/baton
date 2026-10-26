@@ -35,8 +35,8 @@
 
 ## 5. End-to-end
 
-- [ ] 5.1 Chaos test: kill an agent mid-task ⇒ task retried on another agent and run completes; verify in `Baton.Integration.Tests`
-- [ ] 5.2 Throughput smoke: 50 claims/s for 60 s on one group without errors (`Category=Load`, not in CI); verify test report attached to PR
+- [x] 5.1 Chaos test: kill an agent mid-task ⇒ task retried on another agent and run completes; verify in `Baton.Integration.Tests`
+- [x] 5.2 Throughput smoke: 50 claims/s for 60 s on one group without errors (`Category=Load`, not in CI); verify test report attached to PR
 
 ## Workflow follow-up
 
