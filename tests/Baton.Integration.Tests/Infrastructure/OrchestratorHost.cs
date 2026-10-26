@@ -1,16 +1,21 @@
 using System.Net;
 using Baton.Agent.Protocol.V1;
 using Baton.Orchestrator.Agents;
+using Baton.Orchestrator.Dispatch;
 using Baton.Persistence;
 using Grpc.Core;
 using Grpc.Net.Client;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Baton.Integration.Tests.Infrastructure;
 
-/// <summary>The orchestrator's gRPC <c>AgentService</c> on Kestrel (HTTP/2, free port) against the shared Postgres.</summary>
+/// <summary>
+/// The orchestrator's gRPC <c>AgentService</c> on Kestrel (HTTP/2, free port) against the shared Postgres,
+/// with the <c>LISTEN</c> wake-up for claims and, when asked, the dispatch loops.
+/// </summary>
 public sealed class OrchestratorHost : IAsyncDisposable
 {
     private readonly WebApplication _app;
@@ -19,18 +24,30 @@ public sealed class OrchestratorHost : IAsyncDisposable
     private OrchestratorHost(WebApplication app)
     {
         _app = app;
-        _channel = GrpcChannel.ForAddress(app.Urls.First());
+        Address = new Uri(app.Urls.First());
+        _channel = GrpcChannel.ForAddress(Address, new GrpcChannelOptions { MaxReceiveMessageSize = ProtocolLimits.MaxMessageBytes });
         Client = new AgentService.AgentServiceClient(_channel);
     }
 
+    public Uri Address { get; }
+
     public AgentService.AgentServiceClient Client { get; }
 
-    public static async Task<OrchestratorHost> StartAsync(PostgresFixture pg)
+    public IServiceProvider Services => _app.Services;
+
+    /// <param name="dispatch">Shortens dispatch timings for the test.</param>
+    /// <param name="loops">Runs the reaper, retry promoter and limit reconciler too.</param>
+    public static async Task<OrchestratorHost> StartAsync(PostgresFixture pg, Action<DispatchOptions>? dispatch = null, bool loops = false)
     {
         var builder = WebApplication.CreateSlimBuilder();
         builder.WebHost.ConfigureKestrel(k => k.Listen(IPAddress.Loopback, 0, o => o.Protocols = HttpProtocols.Http2));
         builder.Services.AddBatonPersistence(pg.ConnectionString);
+        builder.Services.AddBatonListenDataSource(pg.ConnectionString);
         builder.Services.AddAgentProtocol();
+        if (dispatch is not null)
+            builder.Services.Configure(dispatch);
+        if (loops)
+            builder.Services.AddDispatchLoops();
 
         var app = builder.Build();
         app.MapAgentProtocol();

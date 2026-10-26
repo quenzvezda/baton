@@ -21,9 +21,9 @@
 
 ## 3. Orchestrator
 
-- [ ] 3.1 `AgentService.Claim` long-poll with LISTEN-fed wake-up and 2 s re-check (NFR-DispatchLatency); verify latency test p95 < 2 s with 1 waiting agent
-- [ ] 3.2 `ReaperLoop` (5 s) for expired leases, timeout backstop and the persisted offline sweep (ORC-09, WF-05, M2 decision 9); verify host-dies, unresponsive-handler and offline-sweep integration tests
-- [ ] 3.3 `RetryPromoterLoop` (1 s) Retry wait → Queued (ORC-10); verify due-retry test
+- [x] 3.1 `AgentService.Claim` long-poll with LISTEN-fed wake-up and 2 s re-check (NFR-DispatchLatency); verify latency test p95 < 2 s with 1 waiting agent
+- [x] 3.2 `ReaperLoop` (5 s) for expired leases, timeout backstop and the persisted offline sweep (ORC-09, WF-05, M2 decision 9); verify host-dies, unresponsive-handler and offline-sweep integration tests
+- [x] 3.3 `RetryPromoterLoop` (1 s) Retry wait → Queued (ORC-10); verify due-retry test
 - [x] 3.4 Test helper that seeds a Running run with task runs (until M4 admission exists); verify used by the tests above
 - [x] 3.5 `LimitReconcilerLoop` (5 min, singleton) recomputing `concurrency_limits.in_use` (design.md decision 8); verify integration test that a drifted counter is corrected
 

@@ -12,19 +12,20 @@ builder.AddBatonTelemetry("orchestrator");
 builder.Services.AddBatonPersistence(builder.Configuration.GetConnectionString("Baton"));
 builder.Services.AddBatonListenDataSource(builder.Configuration.GetConnectionString("BatonListen"));
 builder.Services.AddHealthChecks().AddCheck<PostgresHealthCheck>("postgres");
-builder.Services.AddAgentProtocol();
+builder.Services.AddAgentProtocol(builder.Configuration);
 
 // Loops land per milestone (design spec §8 "Orchestrator loops", ADR-0008):
 //   M0: PartitionMaintenanceLoop (daily, singleton)
-//   M3: ReaperLoop (5 s, SKIP LOCKED), RetryPromoterLoop (1 s, SKIP LOCKED)
-//   M4: TriggerLoop (1 s, SKIP LOCKED), AdmissionLoop (1 s, advisory lock per group),
-//       LimitReconcilerLoop (5 min, singleton)
+//   M3: ReaperLoop (5 s, SKIP LOCKED), RetryPromoterLoop (1 s, SKIP LOCKED),
+//       LimitReconcilerLoop (5 min, singleton), TasksReadyListener (LISTEN for claims)
+//   M4: TriggerLoop (1 s, SKIP LOCKED), AdmissionLoop (1 s, advisory lock per group)
 //   M6: AgingLoop (30 s, singleton)
 builder.Services.AddHostedService<PartitionMaintenanceLoop>();
+builder.Services.AddDispatchLoops();
 
 var app = builder.Build();
 
-// M2: Register, Heartbeat (ADR-0013 credentials); M3: Claim, Start, Complete, AppendLogs.
+// Register, Heartbeat (M2, ADR-0013 credentials); Claim, Start, Complete, AppendLogs (M3).
 app.MapAgentProtocol();
 
 app.MapHealthChecks("/healthz", new HealthCheckOptions
