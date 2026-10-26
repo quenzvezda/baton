@@ -11,4 +11,7 @@ public static class AdvisoryLocks
 
     /// <summary>Singleton <c>PartitionMaintenanceLoop</c> (ADR-0011).</summary>
     public const long PartitionMaintenance = Prefix + 1;
+
+    /// <summary>Singleton <c>LimitReconcilerLoop</c> (M3 design.md decision 8).</summary>
+    public const long LimitReconciler = Prefix + 2;
 }
