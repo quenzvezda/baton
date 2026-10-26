@@ -24,5 +24,5 @@ ADR-0003, ADR-0006, ADR-0007, ADR-0008, ADR-0009. OQ-02 (task duration ⇒ lease
 - [ ] Chaos test: agent killed mid-task ⇒ task retried elsewhere, run completes
 - [ ] p95 Queued→Leased < 2 s with a waiting agent; 50 claims/s for 60 s without errors
 - [ ] Attempt history shows lost/timed-out/succeeded attempts with hosts and tokens
-- [ ] OQ-03 answered and ROADMAP updated if PinnedRun moves
+- [x] OQ-03 answered and ROADMAP updated if PinnedRun moves
 - [ ] Change `add-task-dispatch` archived

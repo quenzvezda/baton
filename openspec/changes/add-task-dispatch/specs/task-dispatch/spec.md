@@ -74,12 +74,20 @@ A dispatched task SHALL be held under a lease that expires after the group's lea
 - **WHEN** a host heartbeats every 10 seconds while running a task for 5 minutes
 - **THEN** the lease never expires and the task is not reassigned
 
+#### Scenario: Heartbeat cadence follows the lease
+- **WHEN** a host registers in a group whose lease duration is 30 seconds
+- **THEN** it is told to heartbeat every 5 seconds, and every 10 seconds for leases of 60 seconds or more
+
 #### Scenario: New token per attempt
 - **WHEN** a task is claimed for attempt 2 after attempt 1 was lost
 - **THEN** attempt 2's token is greater than attempt 1's
 
 ### Requirement: Fenced results (ORC-08)
 Results, start signals and log lines from a host whose lease has expired or been replaced SHALL be rejected without changing any state, and the host SHALL be told the result was stale.
+
+#### Scenario: Expired but not yet reaped
+- **WHEN** a host's lease expired a moment ago and the reaper has not closed the attempt yet
+- **THEN** the host's heartbeat reports the task as lost and its result is rejected as stale
 
 #### Scenario: Late result after reassignment
 - **WHEN** host A's lease on a task expired, host B claimed it, and host A then reports success
@@ -113,6 +121,28 @@ A running attempt SHALL be cancelled when it exceeds its task timeout, and the p
 #### Scenario: Unresponsive handler
 - **WHEN** a handler ignores cancellation and its host keeps heartbeating 60 seconds past the timeout
 - **THEN** the attempt is closed as timed out by the platform and its later result is rejected as stale
+
+### Requirement: Run outcome
+When every task of a running workflow run is final, the run SHALL end in the same step: Failed if any task Failed, otherwise Succeeded; Skipped tasks alone SHALL never fail a run.
+
+#### Scenario: All tasks succeeded
+- **WHEN** the last task of a running run succeeds and every other task succeeded or was skipped
+- **THEN** the run is Succeeded with its finish time set
+
+#### Scenario: A task failed
+- **WHEN** the last task of a running run becomes final and one task of the run failed
+- **THEN** the run is Failed
+
+#### Scenario: Concurrent last tasks
+- **WHEN** the last two running tasks of a run complete at the same moment on different hosts
+- **THEN** the run ends exactly once
+
+### Requirement: Limit counters stay correct (HST-01)
+The platform SHALL periodically recompute every concurrency limit's usage from the live runs and tasks and correct any counter that drifted.
+
+#### Scenario: Drifted counter
+- **WHEN** the group task counter says 5 while 2 tasks of the group are leased or running
+- **THEN** within one reconciliation period the counter says 2
 
 ### Requirement: Attempt history (NFR-Auditability)
 Every attempt SHALL be recorded with its host, fencing token, start and finish times, outcome (succeeded, failed, timed out, lost, cancelled) and error, and every task state transition SHALL be recorded as a run event.
