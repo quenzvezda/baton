@@ -29,9 +29,9 @@
 
 ## 4. Agent
 
-- [ ] 4.1 `AgentWorker` claim loop limited to free slots, heartbeat loop handling lost/cancel lists; verify unit tests with a fake `AgentClient` (new `tests/Baton.Agent.Tests`)
-- [ ] 4.2 `TaskExecutor` with per-task timeout, non-retryable handling, 256 KB output check, always-report semantics; verify unit tests per outcome
-- [ ] 4.3 `ILogger` capture to buffered `AppendLogs` stream; verify log lines arrive in order with sequence numbers
+- [x] 4.1 `AgentWorker` claim loop limited to free slots, heartbeat loop handling lost/cancel lists; verify unit tests with a fake `AgentClient` (new `tests/Baton.Agent.Tests`)
+- [x] 4.2 `TaskExecutor` with per-task timeout, non-retryable handling, 256 KB output check, always-report semantics; verify unit tests per outcome
+- [x] 4.3 `ILogger` capture to buffered `AppendLogs` stream; verify log lines arrive in order with sequence numbers
 
 ## 5. End-to-end
 

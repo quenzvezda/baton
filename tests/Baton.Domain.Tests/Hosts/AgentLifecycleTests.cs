@@ -161,6 +161,21 @@ public sealed class AgentLifecycleTests
         Assert.True(agent.Stopped.IsCompletedSuccessfully);
     }
 
+    [Fact]
+    public void Lease_won_while_a_drain_arrived_is_still_counted_and_delays_stopping()
+    {
+        var agent = Online();
+        agent.HeartbeatReplied(draining: true);
+
+        Assert.True(agent.TaskLeased());
+        agent.ShutdownRequested();
+
+        Assert.Equal(AgentState.Stopping, agent.State);
+        agent.TaskFinished();
+        Assert.Equal(AgentState.Stopped, agent.State);
+        Assert.False(agent.TaskLeased());
+    }
+
     private static AgentLifecycle Online()
     {
         var agent = new AgentLifecycle();

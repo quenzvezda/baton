@@ -22,6 +22,7 @@
     <Project Path="src/Baton.Web/Baton.Web.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Baton.Agent.Tests/Baton.Agent.Tests.csproj" />
     <Project Path="tests/Baton.Domain.Tests/Baton.Domain.Tests.csproj" />
     <Project Path="tests/Baton.Integration.Tests/Baton.Integration.Tests.csproj" />
   </Folder>

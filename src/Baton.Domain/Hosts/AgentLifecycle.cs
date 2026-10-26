@@ -85,6 +85,21 @@ public sealed class AgentLifecycle
         }
     }
 
+    /// <summary>
+    /// Records a task the orchestrator already leased (M3). It is counted even when a drain arrived while
+    /// the claim was in flight, because the lease is held either way; <c>false</c> only once Stopped.
+    /// </summary>
+    public bool TaskLeased()
+    {
+        lock (_gate)
+        {
+            if (_state == AgentState.Stopped)
+                return false;
+            _runningTasks++;
+            return true;
+        }
+    }
+
     public void TaskFinished()
     {
         lock (_gate)
