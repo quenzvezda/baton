@@ -36,6 +36,7 @@ src/
   Shared/                  source files linked into server projects (OpenTelemetry baseline)
 tests/
   Baton.Domain.Tests/      fast unit tests
+  Baton.Agent.Tests/       agent worker and executor against a fake AgentService client
   Baton.Integration.Tests/ Testcontainers Postgres (requires Docker)
 openspec/                  OpenSpec config, specs, changes
 docs/adr/                  Architecture Decision Records
@@ -50,7 +51,9 @@ docker compose up -d                                  # Postgres 16 on localhost
 dotnet restore Baton.slnx
 dotnet build Baton.slnx -c Release
 dotnet test tests/Baton.Domain.Tests                  # unit
+dotnet test tests/Baton.Agent.Tests                   # unit (agent)
 dotnet test tests/Baton.Integration.Tests             # needs Docker
+dotnet test tests/Baton.Integration.Tests --filter Category=Load   # throughput smoke, by hand
 dotnet run --project src/Baton.ControlPlane.Api       # http://localhost:5100
 dotnet run --project src/Baton.Orchestrator           # http://localhost:5200 (gRPC + /healthz)
 dotnet run --project src/Baton.Agent

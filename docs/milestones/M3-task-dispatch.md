@@ -19,10 +19,10 @@ ADR-0003, ADR-0006, ADR-0007, ADR-0008, ADR-0009. OQ-02 (task duration ⇒ lease
 
 ## Exit criteria
 
-- [ ] Claim race test: 8 claimers × 1,000 tasks ⇒ each task leased exactly once
-- [ ] Stale-token Start/Complete/AppendLogs rejected with no state change
-- [ ] Chaos test: agent killed mid-task ⇒ task retried elsewhere, run completes
-- [ ] p95 Queued→Leased < 2 s with a waiting agent; 50 claims/s for 60 s without errors
-- [ ] Attempt history shows lost/timed-out/succeeded attempts with hosts and tokens
+- [x] Claim race test: 8 claimers × 1,000 tasks ⇒ each task leased exactly once
+- [x] Stale-token Start/Complete/AppendLogs rejected with no state change
+- [x] Chaos test: agent killed mid-task ⇒ task retried elsewhere, run completes
+- [x] p95 Queued→Leased < 2 s with a waiting agent; 50 claims/s for 60 s without errors
+- [x] Attempt history shows lost/timed-out/succeeded attempts with hosts and tokens
 - [x] OQ-03 answered and ROADMAP updated if PinnedRun moves
 - [ ] Change `add-task-dispatch` archived

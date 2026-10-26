@@ -75,7 +75,8 @@ work recovered in about one lease period; 50 claims/s sustained on one group in 
 Defaults taken without objection: the timeout backstop is measured from the attempt's Start, or from
 its claim when Start never arrived; run-event types are `task.queued`, `task.skipped`, `task.leased`,
 `task.started`, `task.succeeded`, `task.failed`, `task.timed_out`, `task.lost`, `task.cancelled`,
-`task.retry_scheduled`, `task.retry_due`, `run.succeeded`, `run.failed`; the branch is `m3/task-dispatch`.
+`task.retry_scheduled`, `run.started`, `run.succeeded`, `run.failed` (a due retry is `task.queued` with
+`"retry": true`); the branch is `m3/task-dispatch`.
 
 ## Implementation notes (M3)
 
@@ -105,6 +106,16 @@ its claim when Start never arrived; run-event types are `task.queued`, `task.ski
 - **Wake-up.** `TasksReadyListener` holds the one `LISTEN tasks_ready` session (the non-pooled `listen`
   data source) and reconnects with backoff; waiters in `Claim` re-check every 2 s regardless.
   Every transaction that queues a task or frees a group slot ends with `pg_notify('tasks_ready', group)`.
+- **Log times.** `task_logs.logged_at` keeps the agent's time for display, clamped to
+  `[now() − 1 day, now() + 5 min]` so a wrong clock cannot miss a partition; order comes from `seq`, and a
+  retried chunk (same `seq` and time) is deduplicated by the primary key.
+- **Handlers that ignore cancellation** keep their slot on the agent until they return; the platform has
+  already closed the attempt (timeout backstop), the next heartbeat reports it lost and its result is
+  discarded.
+- **Agent side.** `AgentWorker` runs a claim loop next to the register/heartbeat loop; a lease won while
+  a drain arrived is still run (`AgentLifecycle.TaskLeased`). `TaskExecutor` resolves the handler by graph
+  hash and task key; `TaskLogBuffer`/`TaskLogShipper` ship logs every second and before the report.
+  Agent unit tests live in the new `tests/Baton.Agent.Tests` (fake `AgentService` client).
 - **Run start.** `RunMaterializer` (Persistence) creates the `task_runs` of a Running run: roots
   Queued, the rest Waiting, base priority `clamp(run priority + offset, 0, 100)`, labels = automation's ∪
   task's. Tests seed runs through it now; M4 admission calls it.
