@@ -6,8 +6,8 @@
 
 ## 1. Domain
 
-- [ ] 1.1 Pure DAG-advance function: given completed task + outcome, return downstream transitions incl. skip propagation (ORC-03); verify `DagAdvanceTests` incl. 500-task DAG
-- [ ] 1.2 Retry classification + `Backoff.NextDelay` (ORC-10); verify `BackoffTests` and `RetryClassificationTests` (timeout retryable, non-retryable, exhausted)
+- [x] 1.1 Pure DAG-advance function: given completed task + outcome, return downstream transitions incl. skip propagation (ORC-03); verify `DagAdvanceTests` incl. 500-task DAG
+- [x] 1.2 Retry classification + `Backoff.NextDelay` (ORC-10); verify `BackoffTests` and `RetryClassificationTests` (timeout retryable, non-retryable, exhausted)
 
 ## 2. Queue SQL
 
