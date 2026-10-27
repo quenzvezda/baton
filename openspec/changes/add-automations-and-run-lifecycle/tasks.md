@@ -7,7 +7,7 @@
 - [x] 1.3 Workflow selection pinned/latest (AUT-02) and parameter validation against stored JSON Schema (AUT-03); verify validation error names the field
 - [x] 1.4 Routing, priority bounds, max runs, concurrency policy, run timeout fields (AUT-05, AUT-06, AUT-07, AUT-09); verify validation tests
 - [x] 1.5 Workflow run limit API `PUT/GET/DELETE /api/workflows/{key}/limit` (ORC-02, design.md decision 4); verify API tests
-- [ ] 1.6 OQ-07 secret guidance for definition authors (design.md decision 1); verify the README section is linked from the params rules
+- [x] 1.6 OQ-07 secret guidance for definition authors (design.md decision 1); verify the README section is linked from the params rules
 
 ## 2. Triggers
 

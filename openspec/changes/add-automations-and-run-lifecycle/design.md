@@ -80,6 +80,44 @@ Defaults taken without objection:
     automation selects (the pinned one, or the latest at save time).
 14. The branch is `m4/automations-and-run-lifecycle`.
 
+## Implementation notes (M4)
+
+- **Schema** (migration `AutomationsAndRunLifecycle`, `Schema/0004_automations.sql`): `automations.deleted_at`
+  with the partial unique name index; `automation_triggers.webhook_secret` (renamed from `webhook_secret_hash`);
+  `data_protection_keys`; on `workflow_runs` the columns admission needs, fixed when the run is created —
+  `limit_keys` (sorted; `automation:{id}` left out under Allow), `required_labels` (the automation's) and
+  `run_timeout` — plus `cancel_reason` (`user`, `replaced`, `timeout`) and `blocked_on`; `task_runs.cancel_requested_at`.
+- **Run creation** (`RunCreator`) locks the automation row, looks the idempotency key up first (so a retried
+  delivery is a duplicate even after the automation was disabled), resolves "follow latest" to the highest
+  version that is not retired, then applies the policy. A Skip has no run to own its `run.skipped` event, so the
+  event is filed under the automation's id (`run_events.workflow_run_id = automation id`).
+- **Trigger loop** (`CronTriggers`): one due trigger per transaction, taken with its automation row
+  `FOR UPDATE OF t, a SKIP LOCKED`, so an Operator's edit (automation row, then trigger rows) never deadlocks with
+  it — the trigger fires on the next pass. A trigger whose firing throws is excluded for the rest of the pass and
+  logged; the others still fire.
+- **Admission** (`RunAdmission`): the group's advisory lock is held on a side connection for the whole pass, and
+  each candidate run gets its own transaction (run row `SKIP LOCKED`, then its limit rows in key order). Holding
+  the rows of several runs in one transaction would lock keys out of order across runs. A missing limit row is
+  unlimited and not held. When `group-runs` blocks a run, the rest of the group's candidates are passed over at
+  once. `run.blocked` is written only when the limit a run waits for changes, not on every pass.
+- **Releasing limits** (`LimitRows`, `RunFinalizer`): when an attempt ends, `group-tasks` and — if the run ended —
+  every key in `held_limits` are locked together in key order and decremented, so the "lock in key order" rule
+  of ADR-0009 holds on every path. A Pending run holds nothing, so cancelling it releases nothing.
+- **Cancellation** (`RunCancellation`): run row, then tasks (Waiting/Queued/Retry wait ⇒ Cancelled in one
+  statement, Leased/Running ⇒ `cancel_requested` in the next, so a task a concurrent claim just leased is still
+  signalled), then the run is finalized at once when nothing is leased. The reaper closes a cancelled attempt
+  30 s after the request (outcome `cancelled`, error `CancelGraceExpired`) and starts the cancellation of
+  Running runs past `deadline_at` (reason `timeout` ⇒ the run ends `timed_out`).
+- **Replace** cancels the oldest active run that is not already cancelling; the new run stays Pending until the
+  replaced run has released the automation limit.
+- **Run events** added: `run.created`, `run.skipped`, `run.blocked`, `run.admitted`, `run.cancelling`,
+  `run.cancelled`, `run.timed_out`, `task.cancel_requested`, `task.cancelled`; a finished run's event carries the
+  limits it released.
+- **API**: deleting keeps the `automation:{id}` limit row, so the deleted automation's remaining runs stay under
+  their limit. Enabling recomputes every cron trigger's next fire from `now()` (missed times do not fire); an
+  update recomputes it only when the expression, zone or enabled state changes. A trigger's kind cannot change.
+  The create response echoes the parameters as sent; reads return them as stored (`jsonb` key order).
+
 ## Risks / Trade-offs
 
 - [Clock skew between replicas] → all comparisons use Postgres `now()`.

@@ -296,6 +296,25 @@ curl -H "Authorization: Bearer $JWT" http://localhost:5100/api/hosts
 curl -X POST -H "Authorization: Bearer $JWT" http://localhost:5100/api/hosts/<host-id>/drain
 ```
 
+### Run an automation
+
+With an agent connected (above) and an Operator or Admin token, create an automation for a workflow registered
+from `src/Baton.Definitions` (`GET /api/workflows` lists them; `parameters` must match its schema) and run it. The response's `ETag` is what `If-Match` needs for an update; a webhook trigger's secret is shown only
+in the response that created it.
+
+```bash
+curl -H "Authorization: Bearer $JWT" -H "Content-Type: application/json" http://localhost:5100/api/automations      -d '{"name":"hourly report","workflowKey":"<workflow-key>","hostGroupId":"<group-id>",
+          "parameters":{"region":"apac"},"concurrencyPolicy":"skip",
+          "triggers":[{"kind":"cron","cronExpression":"0 * * * *","timeZone":"UTC"},{"kind":"webhook"}]}'
+curl -X POST -H "Authorization: Bearer $JWT" http://localhost:5100/api/automations/<automation-id>/runs   # Run now
+curl -X POST -H "Authorization: Bearer $JWT" http://localhost:5100/api/runs/<run-id>/cancel
+
+# A webhook delivery: HMAC-SHA256 of the raw body with the trigger's secret, and a delivery id for retries
+body='{"event":"orders.closed"}'
+sig=$(printf '%s' "$body" | openssl dgst -sha256 -hmac "$SECRET" | sed 's/^.* //')
+curl -H "X-Signature: sha256=$sig" -H "X-Delivery-Id: $(uuidgen)" -d "$body" http://localhost:5100/api/webhooks/<trigger-id>
+```
+
 Telemetry (traces, metrics, logs) is exported over OTLP only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set,
 e.g. `http://localhost:4317` for a local OpenTelemetry Collector.
 

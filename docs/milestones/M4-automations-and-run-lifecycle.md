@@ -18,10 +18,10 @@ ADR-0008, ADR-0009. OQ-07 (secret store) for the parameter guidance.
 
 ## Exit criteria
 
-- [ ] Two orchestrator replicas never create two runs for the same fire time
-- [ ] One integration test per concurrency policy (Skip, Queue, Replace, Allow)
-- [ ] Admission: group-full, pass-over and no-deadlock-across-replicas tests green
-- [ ] Cancellation scenarios (running, unresponsive host, already finished) green
-- [ ] E2E: cron automation runs the example workflow on two agents to Succeeded
-- [ ] OQ-07 answered and documented for definition authors
+- [x] Two orchestrator replicas never create two runs for the same fire time
+- [x] One integration test per concurrency policy (Skip, Queue, Replace, Allow)
+- [x] Admission: group-full, pass-over and no-deadlock-across-replicas tests green
+- [x] Cancellation scenarios (running, unresponsive host, already finished) green
+- [x] E2E: cron automation runs the example workflow on two agents to Succeeded
+- [x] OQ-07 answered and documented for definition authors
 - [ ] Change `add-automations-and-run-lifecycle` archived
