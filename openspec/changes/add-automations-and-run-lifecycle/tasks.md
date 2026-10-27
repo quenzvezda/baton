@@ -6,6 +6,8 @@
 - [ ] 1.2 ETag/`If-Match` with `row_version` (AUT-01); verify stale update returns 412
 - [ ] 1.3 Workflow selection pinned/latest (AUT-02) and parameter validation against stored JSON Schema (AUT-03); verify validation error names the field
 - [ ] 1.4 Routing, priority bounds, max runs, concurrency policy, run timeout fields (AUT-05, AUT-06, AUT-07, AUT-09); verify validation tests
+- [ ] 1.5 Workflow run limit API `PUT/GET/DELETE /api/workflows/{key}/limit` (ORC-02, design.md decision 4); verify API tests
+- [ ] 1.6 OQ-07 secret guidance for definition authors (design.md decision 1); verify the README section is linked from the params rules
 
 ## 2. Triggers
 
@@ -13,7 +15,7 @@
 - [ ] 2.2 `TriggerLoop` (1 s, SKIP LOCKED) with idempotent run creation (ORC-01); verify two-replica integration test creates one run
 - [ ] 2.3 Concurrency policies Skip/Queue/Replace/Allow (AUT-07); verify one integration test per policy
 - [ ] 2.4 Run now endpoint `POST /api/automations/{id}/runs` (AUT-04); verify API test
-- [ ] 2.5 Webhook intake with HMAC verification and secret hashing (AUT-04); verify valid/invalid signature tests
+- [ ] 2.5 Webhook intake with HMAC verification, encrypted secrets (ADR-0015) and delivery dedupe (AUT-04, ORC-01); verify valid/invalid signature and retried-delivery tests
 - [ ] 2.6 Cron accuracy (NFR-TriggerAccuracy); verify integration test: due trigger has a run within 5 s
 
 ## 3. Run lifecycle

@@ -30,3 +30,5 @@ Statuses: `Proposed` · `Accepted` · `Rejected` · `Deprecated` · `Superseded 
 | [0012](0012-web-ui-framework.md) | Web UI framework | **Proposed** | §4, OQ-09 |
 | [0013](0013-agent-authentication.md) | Agent authentication with group-scoped bearer tokens | Accepted | §3 |
 | [0014](0014-people-authentication-with-oidc.md) | People authenticate with OIDC bearer tokens | Accepted | §3 |
+| [0015](0015-webhook-secrets-with-data-protection.md) | Webhook secrets encrypted with ASP.NET Core Data Protection | **Proposed** | §3, AUT-04 |
+| [0016](0016-json-schema-validation-with-jsonschema-net.md) | Validate automation parameters with JsonSchema.Net | **Proposed** | AUT-03 |

@@ -46,7 +46,7 @@ that relies on it.
 - Nullable annotations are enforced, and constructor parameters without a default are **required**.
   Give optional values a default (`DateOnly? ReportDate = null`).
 - Only JSON-serializable members: no `Type`, delegates, pointers or streams. Startup fails otherwise.
-- Never put secrets in params; reference them by name (design spec §3).
+- Never put secrets in params; reference them by name (design spec §3, "Secrets" below).
 
 ## Handlers
 
@@ -63,3 +63,33 @@ that relies on it.
 - Logging: write to `ctx.Logger`; it is captured into the task's logs. The repository treats CA1848 as
   an error, so use `[LoggerMessage]` source-generated methods (`static partial void LogRendering(...)`
   on a `partial` handler class) rather than `LogInformation(...)`.
+
+## Secrets
+
+Baton ships no secret store (OQ-07, answered 2026-10-27). Params hold the **name** of a secret, never its
+value; the handler resolves the name on the agent through `IConfiguration`, which the deployment backs with
+whatever store it has (environment variables, Azure Key Vault, HashiCorp Vault, Kubernetes secrets mounted
+as files).
+
+```csharp
+public sealed record ExportParams(string Region, string SftpPasswordSecret);   // e.g. "exports:sftp-password"
+
+public sealed class UploadExport(IConfiguration configuration) : ITaskHandler<ExportParams, Uploaded>
+{
+    public async Task<Uploaded> ExecuteAsync(TaskContext<ExportParams> ctx, CancellationToken ct)
+    {
+        var password = configuration[ctx.Params.SftpPasswordSecret]
+            ?? throw new NonRetryableException($"Secret '{ctx.Params.SftpPasswordSecret}' is not configured on this host.");
+        // ...
+    }
+}
+```
+
+- Name secrets with `:`-separated paths (`exports:sftp-password`); configuration providers map them to
+  their own syntax (`exports__sftp-password` for environment variables, `exports--sftp-password` in Key
+  Vault).
+- A missing secret will not appear on retry: throw `NonRetryableException`.
+- Never log a secret's value or return it in a task output; outputs and logs are stored in Postgres and
+  shown in the console.
+- Hosts that run a workflow need its secrets: route the automation with labels (`RequireLabels`, AUT-05)
+  to the hosts that have them.

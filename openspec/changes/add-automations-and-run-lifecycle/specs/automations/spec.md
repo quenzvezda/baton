@@ -26,6 +26,10 @@ Operators SHALL be able to create, edit, clone, enable, disable and delete an au
 - **WHEN** an Operator deletes an automation that has a running run
 - **THEN** the automation is removed and the run continues to completion
 
+#### Scenario: Name of a deleted automation
+- **WHEN** an Operator deletes automation `APAC nightly sales report` and creates a new one with that name
+- **THEN** the new automation is stored and the deleted one's runs still refer to the deleted automation
+
 ### Requirement: Concurrent edit protection (AUT-01)
 Updating an automation SHALL require the version last read by the client and SHALL be rejected if the automation changed since.
 
@@ -52,7 +56,7 @@ Workflow parameters of an automation SHALL be validated against the selected def
 - **THEN** the save is rejected with a validation error naming `region`
 
 ### Requirement: Triggers (AUT-04)
-An automation SHALL have one or more triggers of kind cron (with an IANA time zone), manual Run now, or webhook verified by an HMAC-SHA256 signature of the request body.
+An automation SHALL have one or more triggers of kind cron (with an IANA time zone), manual Run now, or webhook verified by an HMAC-SHA256 signature of the request body. A webhook trigger's secret SHALL be shown only when it is created or rotated and SHALL be stored encrypted.
 
 #### Scenario: Cron in a time zone
 - **WHEN** a trigger `0 2 * * *` in `Asia/Singapore` is enabled
@@ -62,6 +66,10 @@ An automation SHALL have one or more triggers of kind cron (with an IANA time zo
 - **WHEN** an Operator clicks Run now on an enabled automation
 - **THEN** one run is created immediately
 
+#### Scenario: Run now on a disabled automation
+- **WHEN** an Operator clicks Run now on a disabled automation
+- **THEN** the request is rejected with 409 Conflict and no run is created
+
 #### Scenario: Valid webhook
 - **WHEN** a webhook request carries a correct signature for the trigger's secret
 - **THEN** one run is created and the response is 202 Accepted with the run id
@@ -69,6 +77,10 @@ An automation SHALL have one or more triggers of kind cron (with an IANA time zo
 #### Scenario: Invalid webhook signature
 - **WHEN** a webhook request has a missing or wrong signature
 - **THEN** the response is 401 Unauthorized and no run is created
+
+#### Scenario: Webhook secret shown once
+- **WHEN** an Operator creates an automation with a webhook trigger
+- **THEN** the response contains the trigger's secret, and reading the automation later does not
 
 ### Requirement: Cron accuracy (NFR-TriggerAccuracy)
 A cron trigger's run SHALL be created within 5 seconds of its scheduled fire time while the platform is up.
