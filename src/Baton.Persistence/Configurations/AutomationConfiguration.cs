@@ -27,7 +27,8 @@ internal sealed class AutomationConfiguration : IEntityTypeConfiguration<Automat
         builder.Property(a => a.UpdatedAt).HasDefaultValueSql("now()");
         builder.Property(a => a.RowVersion).HasSuppliedDefault("0").IsConcurrencyToken();
 
-        builder.HasIndex(a => a.Name).IsUnique().HasDatabaseName("automations_name_key");
+        // Unique among automations not deleted (M4 design.md decision 5).
+        builder.HasIndex(a => a.Name).IsUnique().HasDatabaseName("automations_name_key").HasFilter("deleted_at IS NULL");
 
         builder.HasOne<HostGroupEntity>()
             .WithMany()

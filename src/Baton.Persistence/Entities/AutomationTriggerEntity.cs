@@ -19,6 +19,8 @@ public sealed class AutomationTriggerEntity
 
     public DateTimeOffset? NextFireAt { get; set; }
     public DateTimeOffset? LastFiredAt { get; set; }
-    public byte[]? WebhookSecretHash { get; set; }
+    /// <summary>The webhook secret, encrypted with Data Protection (ADR-0015).</summary>
+    public byte[]? WebhookSecret { get; set; }
+
     public bool Enabled { get; set; } = true;
 }

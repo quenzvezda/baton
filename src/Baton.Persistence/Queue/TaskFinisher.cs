@@ -44,8 +44,9 @@ internal sealed record EndingAttempt(
 /// <summary>
 /// Ends an attempt in the caller's transaction (ORC-03, ORC-09, ORC-10, NFR-Auditability): the task's new
 /// state, the attempt row and run events; for a final task the DAG advance with skip propagation and the
-/// run's outcome (design.md decision 7); then the <c>group-tasks</c> release and the wake-up. The caller
-/// holds the run row and the task row (design.md "Lock order").
+/// run's outcome (<see cref="RunFinalizer"/>); then the release of <c>group-tasks</c> and, when the run ended,
+/// of the limits it held, all in key order (ADR-0009), and the wake-up. The caller holds the run row and the
+/// task row (M3 design.md "Lock order").
 /// </summary>
 internal sealed class TaskFinisher(DefinitionGraphCache graphs)
 {
@@ -84,24 +85,6 @@ internal sealed class TaskFinisher(DefinitionGraphCache graphs)
         FROM unnest(@keys::text[], @remaining::int[], @failed::int[], @unsuccessful::int[], @statuses::text[])
              AS u(key, remaining, failed, unsuccessful, status)
         WHERE t.workflow_run_id = @runId AND t.task_key = u.key
-        """;
-
-    // Ends the run once no task is left unfinished (design.md decision 7); Skipped tasks alone never fail it.
-    private static readonly string FinalizeRunSql = $"""
-        WITH ended AS (
-          UPDATE workflow_runs r SET
-            status = CASE WHEN EXISTS (SELECT 1 FROM task_runs t WHERE t.workflow_run_id = r.id AND t.status = 'failed')
-                          THEN 'failed' ELSE 'succeeded' END,
-            finished_at = now()
-          WHERE r.id = @runId AND r.status = 'running'
-            AND NOT EXISTS (SELECT 1 FROM task_runs t WHERE t.workflow_run_id = r.id
-                            AND t.status NOT IN ('succeeded','failed','skipped','cancelled'))
-          RETURNING r.id, r.status)
-        INSERT INTO run_events (workflow_run_id, type) SELECT id, 'run.' || status FROM ended
-        """;
-
-    private const string ReleaseSql = """
-        UPDATE concurrency_limits SET in_use = GREATEST(in_use - 1, 0) WHERE key = @key
         """;
 
     /// <param name="outputJson">The handler's output, for a success.</param>
@@ -154,19 +137,11 @@ internal sealed class TaskFinisher(DefinitionGraphCache graphs)
             }
         }
 
-        if (final)
-        {
-            var finalize = new NpgsqlBatchCommand(FinalizeRunSql);
-            finalize.Parameters.AddWithValue("runId", attempt.RunId);
-            batch.BatchCommands.Add(finalize);
-        }
-
-        var release = new NpgsqlBatchCommand(ReleaseSql);
-        release.Parameters.AddWithValue("key", DbNames.GroupTasksLimit(attempt.HostGroupId));
-        batch.BatchCommands.Add(release);
         batch.BatchCommands.Add(RunEvents.NotifyTasksReady(attempt.HostGroupId));
-
         await batch.ExecuteNonQueryAsync(ct);
+
+        var heldByRun = final ? await RunFinalizer.TryFinalizeAsync(connection, transaction, attempt.RunId, ct) : [];
+        await LimitRows.ReleaseAsync(connection, transaction, [DbNames.GroupTasksLimit(attempt.HostGroupId), .. heldByRun], ct);
     }
 
     /// <summary>A second event when the task's new state is not what the attempt's outcome already says.</summary>

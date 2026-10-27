@@ -77,6 +77,30 @@ public static class DbNames
     public const string TasksReadyChannel = "tasks_ready";
 
     public static string GroupTasksLimit(Guid groupId) => $"group-tasks:{groupId}";
+
+    public static string GroupRunsLimit(Guid groupId) => $"group-runs:{groupId}";
+
+    /// <summary><c>workflow_runs.cancel_reason</c>.</summary>
+    public static string CancelReason(RunCancelReason reason) => reason switch
+    {
+        RunCancelReason.User => "user",
+        RunCancelReason.Replaced => "replaced",
+        RunCancelReason.Timeout => "timeout",
+        _ => throw new ArgumentOutOfRangeException(nameof(reason), reason, null),
+    };
+}
+
+/// <summary>Why a run is being cancelled; a run cancelled for its deadline ends TimedOut (AUT-09).</summary>
+public enum RunCancelReason
+{
+    /// <summary>An Operator cancelled it (ORC-11).</summary>
+    User,
+
+    /// <summary>A firing under the Replace policy cancelled it (AUT-07).</summary>
+    Replaced,
+
+    /// <summary>It passed its deadline (AUT-09).</summary>
+    Timeout,
 }
 
 /// <summary><c>run_events.type</c> values written by dispatch (design.md "Decisions agreed with the owner").</summary>
@@ -90,6 +114,21 @@ public static class RunEventTypes
     public const string RunSucceeded = "run.succeeded";
     public const string RunFailed = "run.failed";
     public const string RunStarted = "run.started";
+
+    // M4 (NFR-Auditability, task 3.7).
+    public const string RunCreated = "run.created";
+
+    /// <summary>A firing under Skip at the limit; recorded under the automation's id, as no run exists.</summary>
+    public const string RunSkipped = "run.skipped";
+
+    /// <summary>Admission passed the run over; written when the limit it waits for changes, not on every tick.</summary>
+    public const string RunBlocked = "run.blocked";
+
+    public const string RunAdmitted = "run.admitted";
+    public const string RunCancelling = "run.cancelling";
+    public const string RunCancelled = "run.cancelled";
+    public const string TaskCancelRequested = "task.cancel_requested";
+    public const string TaskCancelled = "task.cancelled";
 
     /// <summary><c>task.succeeded</c>, <c>task.failed</c>, <c>task.timed_out</c>, <c>task.lost</c>, <c>task.cancelled</c>.</summary>
     public static string Attempt(AttemptOutcome outcome) => $"task.{DbNames.Outcome(outcome)}";
