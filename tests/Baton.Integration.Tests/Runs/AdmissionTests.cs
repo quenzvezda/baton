@@ -91,6 +91,30 @@ public sealed class AdmissionTests(PostgresFixture pg)
     }
 
     [Fact]
+    public async Task Automation_labels_apply_to_every_task_of_its_runs()
+    {
+        var s = await RunScenario.CreateAsync(pg, wf =>
+        {
+            var a = wf.Task<Noop>("a");
+            wf.Task<Noop>("b").DependsOn(a).RequireLabels("large-memory");
+        });
+        var apac = await RunScenario.InsertAutomationAsync(pg, s.GroupId, s.WorkflowKey, labels: ["region-apac"]);
+        var plain = await s.Dispatch.AddHostAsync(labels: ["large-memory"]);
+        var inApac = await s.Dispatch.AddHostAsync(labels: ["region-apac", "large-memory"]);
+        var runId = await s.CreateRunAsync(apac);
+        await s.AdmitAsync();
+
+        Assert.Empty((await s.Dispatch.ClaimAsync(plain)).Tasks);
+        await s.Dispatch.CompleteAsync(await s.Dispatch.ClaimOneAsync(inApac));
+        Assert.Empty((await s.Dispatch.ClaimAsync(plain)).Tasks);
+
+        Assert.Equal(["large-memory", "region-apac"], await HostData.ScalarAsync<string[]>(pg,
+            "SELECT array(SELECT unnest(required_labels) ORDER BY 1) FROM task_runs WHERE workflow_run_id = @id AND task_key = 'b'", ("id", runId)));
+        Assert.Equal("b", await HostData.ScalarAsync<string>(pg,
+            "SELECT t.task_key FROM task_runs t WHERE t.id = @id", ("id", (await s.Dispatch.ClaimOneAsync(inApac)).TaskRunId)));
+    }
+
+    [Fact]
     public async Task Higher_priority_runs_are_admitted_first()
     {
         var s = await RunScenario.CreateAsync(pg, policy: "allow", maxRuns: 10, groupMaxRuns: 1, priority: 10);

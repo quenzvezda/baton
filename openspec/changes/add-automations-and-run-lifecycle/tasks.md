@@ -12,11 +12,11 @@
 ## 2. Triggers
 
 - [x] 2.1 Cron next-fire computation with IANA zones (AUT-04); verify unit tests incl. a DST transition zone
-- [ ] 2.2 `TriggerLoop` (1 s, SKIP LOCKED) with idempotent run creation (ORC-01); verify two-replica integration test creates one run
+- [x] 2.2 `TriggerLoop` (1 s, SKIP LOCKED) with idempotent run creation (ORC-01); verify two-replica integration test creates one run
 - [x] 2.3 Concurrency policies Skip/Queue/Replace/Allow (AUT-07); verify one integration test per policy
 - [x] 2.4 Run now endpoint `POST /api/automations/{id}/runs` (AUT-04); verify API test
 - [x] 2.5 Webhook intake with HMAC verification, encrypted secrets (ADR-0015) and delivery dedupe (AUT-04, ORC-01); verify valid/invalid signature and retried-delivery tests
-- [ ] 2.6 Cron accuracy (NFR-TriggerAccuracy); verify integration test: due trigger has a run within 5 s
+- [x] 2.6 Cron accuracy (NFR-TriggerAccuracy); verify integration test: due trigger has a run within 5 s
 
 ## 3. Run lifecycle
 
@@ -30,7 +30,7 @@
 
 ## 4. End-to-end
 
-- [ ] 4.1 E2E: cron automation → run → tasks on two agents → Succeeded, using the design-spec example workflow; verify in integration suite
+- [x] 4.1 E2E: cron automation → run → tasks on two agents → Succeeded, using the design-spec example workflow; verify in integration suite
 
 ## Workflow follow-up
 

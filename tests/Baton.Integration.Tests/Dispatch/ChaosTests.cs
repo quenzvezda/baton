@@ -26,7 +26,7 @@ public sealed class ChaosTests(PostgresFixture pg)
         await using var first = await AgentProcess.StartAsync(orchestrator.Address, group, token);
         await using var second = await AgentProcess.StartAsync(orchestrator.Address, group, token);
         var agents = new[] { first, second };
-        await EventuallyAsync(() => HostData.ScalarAsync<long>(pg, "SELECT count(*) FROM hosts WHERE host_group_id = @g", ("g", groupId)),
+        await Eventually.UntilAsync(() => HostData.ScalarAsync<long>(pg, "SELECT count(*) FROM hosts WHERE host_group_id = @g", ("g", groupId)),
             count => count == 2, "both agents registered");
 
         var runs = (RunMaterializer)orchestrator.Services.GetService(typeof(RunMaterializer))!;
@@ -35,14 +35,14 @@ public sealed class ChaosTests(PostgresFixture pg)
             CancellationToken.None);
 
         // Kill whichever agent holds the hanging first attempt of `transform`.
-        var holder = await EventuallyAsync(async () => await HostData.ScalarAsync<string>(pg, """
+        var holder = await Eventually.UntilAsync(async () => await HostData.ScalarAsync<string>(pg, """
             SELECT COALESCE((SELECT h.name FROM task_runs t JOIN hosts h ON h.id = t.lease_host_id
                              WHERE t.workflow_run_id = @run AND t.task_key = 'transform' AND t.status = 'running'), '')
             """, ("run", runId)), name => name.Length > 0, "transform running");
         var victim = agents.Single(a => a.Name == holder);
         victim.Kill();
 
-        await EventuallyAsync(async () => await HostData.ScalarAsync<string>(pg, "SELECT status FROM workflow_runs WHERE id = @id", ("id", runId)),
+        await Eventually.UntilAsync(async () => await HostData.ScalarAsync<string>(pg, "SELECT status FROM workflow_runs WHERE id = @id", ("id", runId)),
             status => status is "succeeded" or "failed", "the run to finish", TimeSpan.FromSeconds(60));
 
         Assert.Equal("succeeded", await HostData.ScalarAsync<string>(pg, "SELECT status FROM workflow_runs WHERE id = @id", ("id", runId)));
@@ -55,19 +55,5 @@ public sealed class ChaosTests(PostgresFixture pg)
             """, ("run", runId));
         var survivor = agents.Single(a => a != victim).Name;
         Assert.Equal($"1:lost:{victim.Name},2:succeeded:{survivor}", attempts);
-    }
-
-    private static async Task<T> EventuallyAsync<T>(Func<Task<T>> read, Func<T, bool> done, string what, TimeSpan? within = null)
-    {
-        var deadline = DateTime.UtcNow + (within ?? TimeSpan.FromSeconds(30));
-        while (true)
-        {
-            var value = await read();
-            if (done(value))
-                return value;
-            if (DateTime.UtcNow > deadline)
-                Assert.Fail($"Timed out waiting for {what}; last value: {value}.");
-            await Task.Delay(100);
-        }
     }
 }

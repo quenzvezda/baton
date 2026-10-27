@@ -26,7 +26,10 @@ public sealed class AgentProcess : IAsyncDisposable
 
     public string Name { get; }
 
-    public static async Task<AgentProcess> StartAsync(Uri orchestrator, string group, string token, int slots = 2)
+    /// <param name="labels">The host's labels (HST-02).</param>
+    /// <param name="services">Extra services for the handlers, e.g. the example workflow's renderer.</param>
+    public static async Task<AgentProcess> StartAsync(
+        Uri orchestrator, string group, string token, int slots = 2, string[]? labels = null, Action<IServiceCollection>? services = null)
     {
         var name = HostData.NewName("agent");
         var builder = Host.CreateApplicationBuilder();
@@ -39,7 +42,10 @@ public sealed class AgentProcess : IAsyncDisposable
             ["Agent:Token"] = token,
             ["Agent:ClaimLongPollSeconds"] = "2",
         });
+        builder.Configuration.AddInMemoryCollection((labels ?? []).Select((label, i) =>
+            KeyValuePair.Create($"Agent:Labels:{i}", (string?)label)));
         builder.Services.AddBatonAgent(builder.Configuration, typeof(AgentProcess).Assembly);
+        services?.Invoke(builder.Services);
 
         var network = new KillSwitch(new SocketsHttpHandler());
         builder.Services.AddSingleton(GrpcChannel.ForAddress(orchestrator, new GrpcChannelOptions
