@@ -27,12 +27,13 @@ and fenced leases keep a stale worker from ever overwriting a newer result.
 ---
 
 > [!NOTE]
-> **Project status: M0, M1 and M2 done, M3 next.** The design, the architecture decisions and
+> **Project status: M0, M1, M2 and M3 done, M4 next.** The design, the architecture decisions and
 > the specifications for every v1 milestone are complete. The schema, test harness and CI are in
 > place, and workflows written in C# are validated, versioned, registered and listed by the
 > catalog API. Agents register, heartbeat and drain with group-scoped credentials, and people sign
-> in with OIDC roles. Engine behavior is being built milestone by milestone, spec first. See
-> [Roadmap](#roadmap).
+> in with OIDC roles. Ready tasks are dispatched to eligible agents under fenced leases, and lost or
+> failed attempts are retried elsewhere. Engine behavior is being built milestone by milestone, spec
+> first. See [Roadmap](#roadmap).
 
 ## Why Baton?
 
@@ -228,7 +229,7 @@ mapped to a milestone.
 | **M0** | [Foundation](docs/milestones/M0-foundation.md) | Solution, migrations, Postgres test harness, CI | ✅ Done |
 | **M1** | [Workflow definitions](docs/milestones/M1-workflow-definitions.md) | Builder, DAG validation, hashing, registration | ✅ Done |
 | **M2** | [Host registry](docs/milestones/M2-host-registry.md) | Agent registration, heartbeats, drain, access control | ✅ Done |
-| **M3** | [Task dispatch & leases](docs/milestones/M3-task-dispatch.md) | Claims, fencing, reaper, retries | 📝 Specified |
+| **M3** | [Task dispatch & leases](docs/milestones/M3-task-dispatch.md) | Claims, fencing, reaper, retries | ✅ Done |
 | **M4** | [Automations & run lifecycle](docs/milestones/M4-automations-and-run-lifecycle.md) | Triggers, admission, limits, cancellation | 📝 Specified |
 | **M5** | [Web console & monitoring](docs/milestones/M5-web-console-and-monitoring.md) | Catalog, runs, DAG view, live logs, hosts | 📝 Specified |
 | **G1** | [v1 production readiness](docs/milestones/G1-v1-production-readiness.md) | Load, chaos and security gate | — |

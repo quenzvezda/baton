@@ -25,4 +25,4 @@ ADR-0003, ADR-0006, ADR-0007, ADR-0008, ADR-0009. OQ-02 (task duration ⇒ lease
 - [x] p95 Queued→Leased < 2 s with a waiting agent; 50 claims/s for 60 s without errors
 - [x] Attempt history shows lost/timed-out/succeeded attempts with hosts and tokens
 - [x] OQ-03 answered and ROADMAP updated if PinnedRun moves
-- [ ] Change `add-task-dispatch` archived
+- [x] Change `add-task-dispatch` archived
