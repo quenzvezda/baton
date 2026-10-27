@@ -11,7 +11,7 @@
 
 ## 2. Triggers
 
-- [ ] 2.1 Cron next-fire computation with IANA zones (AUT-04); verify unit tests incl. a DST transition zone
+- [x] 2.1 Cron next-fire computation with IANA zones (AUT-04); verify unit tests incl. a DST transition zone
 - [ ] 2.2 `TriggerLoop` (1 s, SKIP LOCKED) with idempotent run creation (ORC-01); verify two-replica integration test creates one run
 - [ ] 2.3 Concurrency policies Skip/Queue/Replace/Allow (AUT-07); verify one integration test per policy
 - [ ] 2.4 Run now endpoint `POST /api/automations/{id}/runs` (AUT-04); verify API test

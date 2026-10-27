@@ -8,6 +8,8 @@
   <ItemGroup>
     <!-- AddWorkflows only; no container, no I/O (M1 design "Placement") -->
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <!-- Cron next-fire computation (AUT-04); pure, no I/O -->
+    <PackageReference Include="Cronos" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Baton.Domain.Tests" />
