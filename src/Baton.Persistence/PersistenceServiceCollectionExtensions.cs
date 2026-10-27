@@ -27,6 +27,12 @@ public static class PersistenceServiceCollectionExtensions
         services.AddSingleton<WorkflowRegistrar>();
         services.AddSingleton<AgentRegistry>();
         services.AddSingleton<HostDirectory>();
+        services.AddSingleton<DefinitionGraphCache>();
+        services.AddSingleton<RunMaterializer>();
+        services.AddSingleton<TaskClaims>();
+        services.AddSingleton<TaskLeases>();
+        services.AddSingleton<LeaseReaper>();
+        services.AddSingleton<RetryPromoter>();
         return services;
     }
 

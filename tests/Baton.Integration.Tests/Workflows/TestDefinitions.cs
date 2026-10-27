@@ -3,8 +3,9 @@ using Baton.Domain.Workflows;
 
 namespace Baton.Integration.Tests.Workflows;
 
-// Public on purpose: together with the linked NightlySalesReport sample, these two are the
-// "definitions package" an AddWorkflows scan of this test assembly finds (WF-01).
+// Public on purpose: together with the linked NightlySalesReport sample and Dispatch/ChaosWorkflow (which
+// the in-process agents run), these are the "definitions package" an AddWorkflows scan of this test
+// assembly finds (WF-01).
 
 public sealed record HousekeepingParams(int KeepDays = 90);
 

@@ -23,9 +23,12 @@ jobs:
       - run: dotnet restore Baton.slnx
       - run: dotnet build Baton.slnx --no-restore -c Release
       - name: Unit tests
-        run: dotnet test tests/Baton.Domain.Tests --no-build -c Release
+        run: |
+          dotnet test tests/Baton.Domain.Tests --no-build -c Release
+          dotnet test tests/Baton.Agent.Tests --no-build -c Release
       - name: Integration tests (Testcontainers, Docker is available on ubuntu-latest)
-        run: dotnet test tests/Baton.Integration.Tests --no-build -c Release
+        # The throughput smoke (Category=Load) runs by hand; its report goes on the milestone PR.
+        run: dotnet test tests/Baton.Integration.Tests --no-build -c Release --filter "Category!=Load"
 
   openspec:
     runs-on: ubuntu-latest

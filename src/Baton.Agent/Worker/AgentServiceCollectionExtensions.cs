@@ -1,3 +1,5 @@
+using System.Reflection;
+using Baton.Agent.Execution;
 using Baton.Agent.Protocol.V1;
 using Baton.Definitions;
 using Baton.Domain.Hosts;
@@ -12,8 +14,10 @@ namespace Baton.Agent.Worker;
 
 public static class AgentServiceCollectionExtensions
 {
-    /// <summary>Options, gRPC channel and client with retries, lifecycle and the worker (design.md "Agent resilience").</summary>
-    public static IServiceCollection AddBatonAgent(this IServiceCollection services, IConfiguration configuration)
+    /// <summary>Options, gRPC channel and client with retries, lifecycle, executor and the worker (design.md "Agent resilience").</summary>
+    /// <param name="definitionAssemblies">Where the definitions and handlers live; the Baton.Definitions package when none are given.</param>
+    public static IServiceCollection AddBatonAgent(
+        this IServiceCollection services, IConfiguration configuration, params Assembly[] definitionAssemblies)
     {
         services.AddOptions<AgentOptions>()
             .Bind(configuration.GetSection(AgentOptions.Section))
@@ -30,14 +34,21 @@ public static class AgentServiceCollectionExtensions
             MaxRetryAttempts = 4,
         }));
 
-        services.AddSingleton(sp => GrpcChannel.ForAddress(sp.GetRequiredService<IOptions<AgentOptions>>().Value.OrchestratorUrl!));
+        services.AddSingleton(sp => GrpcChannel.ForAddress(
+            sp.GetRequiredService<IOptions<AgentOptions>>().Value.OrchestratorUrl!,
+            new GrpcChannelOptions
+            {
+                MaxReceiveMessageSize = ProtocolLimits.MaxMessageBytes,
+                MaxSendMessageSize = ProtocolLimits.MaxMessageBytes,
+            }));
         services.AddSingleton(sp => new AgentService.AgentServiceClient(sp.GetRequiredService<GrpcChannel>()));
         services.AddSingleton<AgentClient>();
 
         // The definitions this build carries; their hashes are reported at registration (HST-02).
-        services.AddWorkflows(typeof(DefinitionsAssembly).Assembly);
+        services.AddWorkflows(definitionAssemblies.Length > 0 ? definitionAssemblies : [typeof(DefinitionsAssembly).Assembly]);
         services.AddSingleton<AgentIdentity>();
         services.AddSingleton<AgentLifecycle>();
+        services.AddSingleton<TaskExecutor>();
         services.AddHostedService<AgentWorker>();
         return services;
     }

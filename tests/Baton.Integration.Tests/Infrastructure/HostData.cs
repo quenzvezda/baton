@@ -28,13 +28,15 @@ public static class HostData
         return (id, token);
     }
 
-    public static async Task<Guid> InsertHostAsync(PostgresFixture pg, Guid groupId, string? name = null, int slots = 4)
+    public static async Task<Guid> InsertHostAsync(
+        PostgresFixture pg, Guid groupId, string? name = null, int slots = 4, string[]? labels = null, string[]? hashes = null)
     {
         var id = Guid.CreateVersion7();
         await ExecuteAsync(pg, """
-            INSERT INTO hosts (id, name, host_group_id, capacity_slots, status, agent_version, definition_hashes, last_heartbeat_at)
-            VALUES (@id, @name, @group, @slots, 'online', '1.0.0', '{}', now())
-            """, ("id", id), ("name", name ?? NewName("host")), ("group", groupId), ("slots", slots));
+            INSERT INTO hosts (id, name, host_group_id, labels, capacity_slots, status, agent_version, definition_hashes, last_heartbeat_at)
+            VALUES (@id, @name, @group, @labels, @slots, 'online', '1.0.0', @hashes, now())
+            """, ("id", id), ("name", name ?? NewName("host")), ("group", groupId), ("labels", labels ?? []), ("slots", slots),
+            ("hashes", hashes ?? []));
         return id;
     }
 

@@ -6,6 +6,8 @@
     <ProjectReference Include="..\..\src\Baton.Persistence\Baton.Persistence.csproj" />
     <ProjectReference Include="..\..\src\Baton.Orchestrator\Baton.Orchestrator.csproj" />
     <ProjectReference Include="..\..\src\Baton.ControlPlane.Api\Baton.ControlPlane.Api.csproj" />
+    <!-- Real agents in-process for the chaos test (M3 task 5.1) -->
+    <ProjectReference Include="..\..\src\Baton.Agent\Baton.Agent.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Grpc.Net.Client" />
