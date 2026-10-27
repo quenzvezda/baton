@@ -16,7 +16,7 @@ builder.Services.AddAgentProtocol(builder.Configuration);
 
 // Loops land per milestone (design spec §8 "Orchestrator loops", ADR-0008):
 //   M0: PartitionMaintenanceLoop (daily, singleton)
-//   M3: ReaperLoop (5 s, SKIP LOCKED), RetryPromoterLoop (1 s, SKIP LOCKED),
+//   M3: ReaperLoop (5 s, SKIP LOCKED; M4 adds cancel grace and run deadlines), RetryPromoterLoop (1 s, SKIP LOCKED),
 //       LimitReconcilerLoop (5 min, singleton), TasksReadyListener (LISTEN for claims)
 //   M4: TriggerLoop (1 s, SKIP LOCKED), AdmissionLoop (1 s, advisory lock per group)
 //   M6: AgingLoop (30 s, singleton)
