@@ -37,6 +37,7 @@ src/
 tests/
   Baton.Domain.Tests/      fast unit tests
   Baton.Agent.Tests/       agent worker and executor against a fake AgentService client
+  Baton.Web.Tests/         console components (bUnit) against a fake Control Plane API
   Baton.Integration.Tests/ Testcontainers Postgres (requires Docker)
 openspec/                  OpenSpec config, specs, changes
 docs/adr/                  Architecture Decision Records
@@ -47,11 +48,12 @@ docs/milestones/           milestone + gate definitions with exit criteria
 ## Commands
 
 ```bash
-docker compose up -d                                  # Postgres 16 on localhost:5432 (baton/baton)
+docker compose up -d                                  # Postgres 16 on :5432 (baton/baton), Keycloak on :8080
 dotnet restore Baton.slnx
 dotnet build Baton.slnx -c Release
 dotnet test tests/Baton.Domain.Tests                  # unit
 dotnet test tests/Baton.Agent.Tests                   # unit (agent)
+dotnet test tests/Baton.Web.Tests                     # unit (console components, bUnit)
 dotnet test tests/Baton.Integration.Tests             # needs Docker
 dotnet test tests/Baton.Integration.Tests --filter Category=Load   # throughput smoke, by hand
 dotnet run --project src/Baton.ControlPlane.Api       # http://localhost:5100

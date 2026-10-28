@@ -1,0 +1,49 @@
+@page "/workflows"
+@inject IBatonApi Api
+
+<PageTitle>Workflows · Baton</PageTitle>
+
+<h1>Workflows</h1>
+<ErrorMessage Text="@_error" />
+@if (_workflows is null)
+{
+    <p class="muted">Loading…</p>
+}
+else if (_workflows.Count == 0)
+{
+    <p class="muted">No workflow is registered yet.</p>
+}
+else
+{
+    <table class="grid">
+        <thead><tr><th>Workflow</th><th>Key</th><th>Latest version</th><th>Registered</th></tr></thead>
+        <tbody>
+            @foreach (var workflow in _workflows)
+            {
+                <tr>
+                    <td><a href="@($"workflows/{Uri.EscapeDataString(workflow.Key)}")">@workflow.DisplayName</a></td>
+                    <td><code>@workflow.Key</code></td>
+                    <td>v@(workflow.LatestVersion)@(workflow.IsRetired ? " (retired)" : "")</td>
+                    <td><Moment Value="workflow.RegisteredAt" /></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private IReadOnlyList<WorkflowSummary>? _workflows;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _workflows = await Api.ListWorkflowsAsync();
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+    }
+}

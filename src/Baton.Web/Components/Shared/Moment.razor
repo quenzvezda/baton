@@ -1,0 +1,13 @@
+@* A timestamp in the viewer's terms: UTC to the second, full value on hover. *@
+@if (Value is { } value)
+{
+    <time datetime="@value.ToString("O")" title="@value.ToString("O")">@value.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss") UTC</time>
+}
+else
+{
+    <span class="muted">—</span>
+}
+
+@code {
+    [Parameter] public DateTimeOffset? Value { get; set; }
+}

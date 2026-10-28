@@ -1,0 +1,16 @@
+@if (Value is { } value)
+{
+    <pre class="json">@Format(value)</pre>
+}
+else
+{
+    <span class="muted">—</span>
+}
+
+@code {
+    private static readonly JsonSerializerOptions Indented = new() { WriteIndented = true };
+
+    [Parameter] public JsonElement? Value { get; set; }
+
+    private static string Format(JsonElement value) => JsonSerializer.Serialize(value, Indented);
+}

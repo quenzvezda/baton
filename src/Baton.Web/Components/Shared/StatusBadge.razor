@@ -1,0 +1,15 @@
+@* A run, task or host state as text with its colour — never colour alone (design.md "DAG rendering"). *@
+<span class="badge state-@Css(Status)">@Text(Status)</span>
+
+@code {
+    [Parameter, EditorRequired] public string Status { get; set; } = "";
+
+    public static string Css(string status) => status.Replace('_', '-');
+
+    public static string Text(string status) => status switch
+    {
+        "retry_wait" => "retry wait",
+        "timed_out" => "timed out",
+        _ => status.Replace('_', ' '),
+    };
+}

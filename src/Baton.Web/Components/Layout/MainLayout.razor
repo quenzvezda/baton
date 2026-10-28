@@ -1,13 +1,57 @@
 @inherits LayoutComponentBase
+@inject UserSession Session
+@inject NavigationManager Navigation
 
 <header class="topbar">
-    <strong>Baton</strong>
-    <nav>
-        <NavLink href="" Match="NavLinkMatch.All">Home</NavLink>
-        @* M5: Automations · Workflows · Runs · Hosts · Queue *@
+    <a class="brand" href="">Baton</a>
+    <nav aria-label="Main">
+        <NavLink href="runs">Runs</NavLink>
+        <NavLink href="automations">Automations</NavLink>
+        <NavLink href="workflows">Workflows</NavLink>
+        <NavLink href="hosts">Hosts</NavLink>
     </nav>
+    <div class="user">
+        @if (_user is not null)
+        {
+            <span class="user-name">@_user.Name</span>
+            <span class="user-role">@HighestRole(_user)</span>
+        }
+        <form method="post" action="account/logout">
+            <AntiforgeryToken />
+            <button type="submit" class="link">Sign out</button>
+        </form>
+    </div>
 </header>
 
 <main>
-    @Body
+    @if (!_loaded)
+    {
+        <p class="muted">Loading…</p>
+    }
+    else if (_user is null)
+    {
+        <h1>No access</h1>
+        <p>
+            Your account has no Baton role, or your session expired.
+            <a href="@($"account/login?returnUrl={Uri.EscapeDataString("/" + Navigation.ToBaseRelativePath(Navigation.Uri))}")">Sign in again</a>
+            or ask an administrator for the Viewer role.
+        </p>
+    }
+    else
+    {
+        @Body
+    }
 </main>
+
+@code {
+    private CurrentUser? _user;
+    private bool _loaded;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _user = await Session.GetAsync();
+        _loaded = true;
+    }
+
+    private static string HighestRole(CurrentUser user) => user.Roles.LastOrDefault() ?? "";
+}

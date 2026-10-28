@@ -1,0 +1,94 @@
+@* Inputs generated from a workflow's params schema (AUT-03); errors show next to their field. *@
+@if (!Form.IsSupported)
+{
+    <div class="field">
+        <label for="param-json">Parameters (JSON)</label>
+        <textarea id="param-json" rows="8" disabled="@Disabled" @bind="Form.RawJson" class="mono"></textarea>
+        <FieldError Text="@Errors.GetValueOrDefault("")" />
+    </div>
+}
+else if (Form.Fields.Count == 0)
+{
+    <p class="muted">This workflow takes no parameters.</p>
+}
+else
+{
+    @foreach (var field in Form.Fields)
+    {
+        var id = $"param-{field.Name}";
+        var error = Errors.GetValueOrDefault(field.Name);
+        <div class="field@(error is null ? "" : " invalid")" data-param="@field.Name">
+            @if (field.Kind == FieldKind.Boolean)
+            {
+                <label for="@id" class="check">
+                    <input id="@id" type="checkbox" disabled="@Disabled" checked="@(Form.Values.GetValueOrDefault(field.Name) == "true")"
+                           @onchange="e => SetBoolean(field.Name, e)" />
+                    @field.Label
+                </label>
+            }
+            else
+            {
+                <label for="@id">
+                    @field.Label
+                    @if (field.Required)
+                    {
+                        <span class="required" title="Required">*</span><span class="visually-hidden"> (required)</span>
+                    }
+                </label>
+                @switch (field.Kind)
+                {
+                    case FieldKind.Choice:
+                        <select id="@id" disabled="@Disabled" required="@field.Required" @bind="Form.Values[field.Name]">
+                            <option value="">@(field.Required ? "Choose…" : "(none)")</option>
+                            @foreach (var choice in field.Choices)
+                            {
+                                <option value="@ParameterForm.ChoiceText(choice)">@ParameterForm.ChoiceText(choice)</option>
+                            }
+                        </select>
+                        break;
+                    case FieldKind.TextList:
+                        <textarea id="@id" rows="3" disabled="@Disabled" placeholder="One per line" @bind="Form.Values[field.Name]"></textarea>
+                        break;
+                    case FieldKind.Json:
+                        <textarea id="@id" rows="3" class="mono" disabled="@Disabled" placeholder="JSON" @bind="Form.Values[field.Name]"></textarea>
+                        break;
+                    default:
+                        <input id="@id" type="@InputType(field.Kind)" disabled="@Disabled" required="@field.Required"
+                               placeholder="@Placeholder(field.Kind)" @bind="Form.Values[field.Name]" />
+                        break;
+                }
+            }
+            @if (field.Description is not null)
+            {
+                <small class="muted">@field.Description</small>
+            }
+            <FieldError Text="@error" />
+        </div>
+    }
+}
+
+@code {
+    [Parameter, EditorRequired] public ParameterForm Form { get; set; } = null!;
+
+    /// <summary>Message per field name; the empty name is the whole-JSON input.</summary>
+    [Parameter] public IReadOnlyDictionary<string, string> Errors { get; set; } = new Dictionary<string, string>();
+
+    [Parameter] public bool Disabled { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        foreach (var field in Form.Fields)
+            Form.Values.TryAdd(field.Name, field.Kind == FieldKind.Boolean ? "false" : "");
+    }
+
+    private void SetBoolean(string name, ChangeEventArgs e) => Form.Values[name] = e.Value is true ? "true" : "false";
+
+    private static string InputType(FieldKind kind) => kind switch
+    {
+        FieldKind.WholeNumber or FieldKind.Number => "number",
+        FieldKind.Date => "date",
+        _ => "text",
+    };
+
+    private static string? Placeholder(FieldKind kind) => kind == FieldKind.DateTime ? "2026-10-28T09:00:00+07:00" : null;
+}

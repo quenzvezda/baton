@@ -1,0 +1,111 @@
+@page "/hosts"
+@inject IBatonApi Api
+@inject UserSession Session
+
+<PageTitle>Hosts · Baton</PageTitle>
+
+<div class="page-head">
+    <h1>Hosts</h1>
+    <button type="button" disabled="@_busy" @onclick="LoadAsync">Refresh</button>
+</div>
+<ErrorMessage Text="@_error" />
+@if (_hosts is null)
+{
+    <p class="muted">Loading…</p>
+}
+else if (_hosts.Count == 0)
+{
+    <p class="muted">No agent has registered yet.</p>
+}
+else
+{
+    <table class="grid">
+        <thead>
+            <tr><th>Host</th><th>Group</th><th>Status</th><th>Slots</th><th>Current tasks</th><th>Last heartbeat</th><th>Labels</th><th>Agent</th>
+                @if (_canOperate) { <th><span class="visually-hidden">Actions</span></th> }</tr>
+        </thead>
+        <tbody>
+            @foreach (var host in _hosts)
+            {
+                <tr data-host="@host.Id">
+                    <td>@host.Name</td>
+                    <td>@host.HostGroupName</td>
+                    <td><StatusBadge Status="@host.Status" />@(host.DrainRequested && host.Status != "draining" ? " (drain requested)" : "")</td>
+                    <td>@host.SlotsUsed / @host.SlotsTotal</td>
+                    <td>
+                        @if (host.CurrentTasks.Count == 0)
+                        {
+                            <span class="muted">—</span>
+                        }
+                        @foreach (var task in host.CurrentTasks)
+                        {
+                            <div><a href="@($"runs/{task.WorkflowRunId}")"><code>@task.TaskKey</code></a> #@task.Attempt <StatusBadge Status="@task.Status" /></div>
+                        }
+                    </td>
+                    <td><Moment Value="host.LastHeartbeatAt" /></td>
+                    <td>@string.Join(", ", host.Labels)</td>
+                    <td>@host.AgentVersion</td>
+                    @if (_canOperate)
+                    {
+                        <td class="actions">
+                            @if (host.DrainRequested)
+                            {
+                                <button type="button" disabled="@_busy" @onclick="() => UndrainAsync(host)">Undrain</button>
+                            }
+                            else
+                            {
+                                <button type="button" disabled="@_busy" @onclick="() => DrainAsync(host)">Drain</button>
+                            }
+                        </td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private IReadOnlyList<HostInfo>? _hosts;
+    private bool _canOperate;
+    private bool _busy;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _canOperate = await Session.HasRoleAsync(Roles.Operator);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync() => await RunAsync(async () => _hosts = await Api.ListHostsAsync());
+
+    /// <summary>HST-04: the agent stops claiming at its next heartbeat; running tasks finish.</summary>
+    private Task DrainAsync(HostInfo host) => RunAsync(async () =>
+    {
+        await Api.DrainHostAsync(host.Id);
+        _hosts = await Api.ListHostsAsync();
+    });
+
+    private Task UndrainAsync(HostInfo host) => RunAsync(async () =>
+    {
+        await Api.UndrainHostAsync(host.Id);
+        _hosts = await Api.ListHostsAsync();
+    });
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            await action();
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}
