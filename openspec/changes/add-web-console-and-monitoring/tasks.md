@@ -6,9 +6,9 @@
 
 ## 2. Monitoring API
 
-- [ ] 2.1 `GET /api/runs` with filters and cursor paging (OBS-01); verify paging test without duplicates/gaps on 10k seeded runs
-- [ ] 2.2 `GET /api/runs/{id}` detail with tasks and attempts (OBS-02); verify retried-task test
-- [ ] 2.3 `GET /api/runs/{id}/tasks/{key}/logs?attempt=` full read and SSE live tail (OBS-03); verify ordering test and 2 s live-tail test
+- [x] 2.1 `GET /api/runs` with filters and cursor paging (OBS-01); verify paging test without duplicates/gaps on 10k seeded runs
+- [x] 2.2 `GET /api/runs/{id}` detail with tasks and attempts (OBS-02); verify retried-task test
+- [x] 2.3 `GET /api/runs/{id}/tasks/{key}/logs?attempt=` full read and SSE live tail (OBS-03); verify ordering test and 2 s live-tail test
 
 ## 3. Console
 

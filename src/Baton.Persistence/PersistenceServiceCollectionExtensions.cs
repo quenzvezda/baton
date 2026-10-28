@@ -1,6 +1,7 @@
 using Baton.Persistence.Definitions;
 using Baton.Persistence.Hosts;
 using Baton.Persistence.Queue;
+using Baton.Persistence.Runs;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
@@ -37,6 +38,8 @@ public static class PersistenceServiceCollectionExtensions
         services.AddSingleton<RunCancellation>();
         services.AddSingleton<CronTriggers>();
         services.AddSingleton<RunAdmission>();
+        services.AddSingleton<RunQueries>();
+        services.AddSingleton<TaskLogReader>();
         return services;
     }
 
