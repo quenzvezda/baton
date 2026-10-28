@@ -16,7 +16,7 @@ Each milestone maps to one OpenSpec change (ADR-0002). Phase-1 changes are alrea
 | [M1](docs/milestones/M1-workflow-definitions.md) | Workflow definitions | WF-01..08, WF-09 (API) | `add-workflow-definitions` | Done |
 | [M2](docs/milestones/M2-host-registry.md) | Host registry, agent protocol, access control | HST-01..05, HST-06 (API), NFR-Security | `add-host-registry` | Done |
 | [M3](docs/milestones/M3-task-dispatch.md) | Task dispatch & leases | ORC-03, 04, 05, 07, 08, 09, 10 | `add-task-dispatch` | Done |
-| [M4](docs/milestones/M4-automations-and-run-lifecycle.md) | Automations, triggers & run lifecycle | AUT-01..07, AUT-09, ORC-01, 02, 11 | `add-automations-and-run-lifecycle` | Planned |
+| [M4](docs/milestones/M4-automations-and-run-lifecycle.md) | Automations, triggers & run lifecycle | AUT-01..07, AUT-09, ORC-01, 02, 11 | `add-automations-and-run-lifecycle` | Done |
 | [M5](docs/milestones/M5-web-console-and-monitoring.md) | Web console & run monitoring | OBS-01..03, WF-09 (UI), HST-06 (UI), AUT-03 (form) | `add-web-console-and-monitoring` | Planned |
 | **[G1](docs/milestones/G1-v1-production-readiness.md)** | **Gate: v1 production readiness** | NFRs (§3) | — | — |
 | [M6](docs/milestones/M6-scheduling-and-routing.md) | Scheduling & routing controls | AUT-08, AUT-10, ORC-06, ORC-12, ORC-13 | `add-scheduling-and-routing-controls` *(to create)* | Phase 2 |

@@ -1,8 +1,8 @@
 # ADR-0015: Webhook secrets encrypted with ASP.NET Core Data Protection
 
-- **Status:** Proposed
-- **Date:** 2026-10-27
-- **Deciders:** @Ripan (M4 kickoff, 2026-10-27)
+- **Status:** Accepted
+- **Date:** 2026-10-28 (proposed 2026-10-27)
+- **Deciders:** @Ripan (M4 kickoff 2026-10-27, owner review of M4 2026-10-28)
 - **Spec:** §3 Security · AUT-04 · OpenSpec change `add-automations-and-run-lifecycle` (design.md decision 2)
 
 ## Context

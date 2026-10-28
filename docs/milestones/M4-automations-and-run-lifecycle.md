@@ -24,4 +24,4 @@ ADR-0008, ADR-0009. OQ-07 (secret store) for the parameter guidance.
 - [x] Cancellation scenarios (running, unresponsive host, already finished) green
 - [x] E2E: cron automation runs the example workflow on two agents to Succeeded
 - [x] OQ-07 answered and documented for definition authors
-- [ ] Change `add-automations-and-run-lifecycle` archived
+- [x] Change `add-automations-and-run-lifecycle` archived
