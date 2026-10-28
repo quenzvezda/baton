@@ -232,7 +232,7 @@ mapped to a milestone.
 | **M2** | [Host registry](docs/milestones/M2-host-registry.md) | Agent registration, heartbeats, drain, access control | ✅ Done |
 | **M3** | [Task dispatch & leases](docs/milestones/M3-task-dispatch.md) | Claims, fencing, reaper, retries | ✅ Done |
 | **M4** | [Automations & run lifecycle](docs/milestones/M4-automations-and-run-lifecycle.md) | Triggers, admission, limits, cancellation | ✅ Done |
-| **M5** | [Web console & monitoring](docs/milestones/M5-web-console-and-monitoring.md) | Catalog, runs, DAG view, live logs, hosts | 📝 Specified |
+| **M5** | [Web console & monitoring](docs/milestones/M5-web-console-and-monitoring.md) | Catalog, runs, DAG view, live logs, hosts | 🚧 In review |
 | **G1** | [v1 production readiness](docs/milestones/G1-v1-production-readiness.md) | Load, chaos and security gate | — |
 | M6–M8 | [Phase 2 & 3](ROADMAP.md) | Aging, pinned runs, audit log, re-run from failure, OTel, extensibility | Planned |
 
@@ -252,11 +252,12 @@ Full plan, dependency graph and gates: [ROADMAP.md](ROADMAP.md).
 git clone https://github.com/quenzvezda/baton.git
 cd baton
 
-docker compose up -d                        # PostgreSQL 16 on localhost:5432 (dev credentials)
+docker compose up -d                        # PostgreSQL 16 on :5432, Keycloak on :8080 (dev credentials)
 dotnet tool restore                         # pinned dotnet-ef
 dotnet ef database update -p src/Baton.Persistence -s src/Baton.ControlPlane.Api
 dotnet build Baton.slnx
 dotnet test tests/Baton.Domain.Tests        # fast unit tests
+dotnet test tests/Baton.Web.Tests           # console components (bUnit)
 dotnet test tests/Baton.Integration.Tests   # spins up Postgres via Testcontainers
 ```
 
@@ -317,6 +318,23 @@ body='{"event":"orders.closed"}'
 sig=$(printf '%s' "$body" | openssl dgst -sha256 -hmac "$SECRET" | sed 's/^.* //')
 curl -H "X-Signature: sha256=$sig" -H "X-Delivery-Id: $(uuidgen)" -d "$body" http://localhost:5100/api/webhooks/<trigger-id>
 ```
+
+### Use the console
+
+`dotnet run --project src/Baton.Web` serves the console on http://localhost:5300. It signs you in through
+Keycloak ([ADR-0017](docs/adr/0017-keycloak-as-development-identity-provider.md)) and calls the API with your
+token; Operators and Admins see the actions Viewers do not.
+
+- **Workflows** — every registered workflow with its task graph, parameters and version history.
+- **Automations** — create and edit automations; the parameter form is generated from the workflow's schema
+  and the API's validation messages appear next to the field they concern.
+- **Runs** — filter by automation, workflow, status, host group and date; open a run to see its graph coloured by
+  task state, every attempt with host, times, output and error, and the attempt's log, which follows new lines
+  live while the task runs.
+- **Hosts** — status, slots, current tasks and last heartbeat; drain and undrain.
+
+The same data is available to scripts: `GET /api/runs` (filters and a `cursor` for the next page),
+`GET /api/runs/{id}`, and `GET /api/runs/{id}/tasks/{key}/logs` (send `Accept: text/event-stream` to follow it).
 
 Telemetry (traces, metrics, logs) is exported over OTLP only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set,
 e.g. `http://localhost:4317` for a local OpenTelemetry Collector.
