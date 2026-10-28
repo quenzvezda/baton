@@ -58,4 +58,8 @@ The console SHALL only offer actions the signed-in person's role permits.
 
 #### Scenario: Viewer sees no mutating actions
 - **WHEN** a Viewer opens a run detail page
-- **THEN** no Cancel or Retry action is offered
+- **THEN** no Cancel action is offered
+
+#### Scenario: Operator can cancel
+- **WHEN** an Operator opens a Running run's detail page
+- **THEN** a Cancel action is offered

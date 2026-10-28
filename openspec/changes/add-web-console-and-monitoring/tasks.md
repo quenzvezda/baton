@@ -2,7 +2,7 @@
 
 ## 1. Decisions
 
-- [ ] 1.1 Accept ADR-0012 (UI framework) and close OQ-09; verify ADR status in `docs/adr/README.md`
+- [x] 1.1 Accept ADR-0012 (UI framework) and close OQ-09; verify ADR status in `docs/adr/README.md`
 
 ## 2. Monitoring API
 
@@ -12,7 +12,7 @@
 
 ## 3. Console
 
-- [ ] 3.1 Sign-in, layout, navigation and typed API client; verify login round-trip against a dev IdP
+- [ ] 3.1 Sign-in (OIDC, Keycloak dev realm per ADR-0017), `GET /api/me`, layout, navigation and typed API client; verify login round-trip against the dev IdP
 - [ ] 3.2 Workflow catalog with DAG rendering and version selector (WF-09); verify component test renders the example DAG
 - [ ] 3.3 Automations list and editor with schema-generated form and server error mapping (AUT-03); verify component tests for required fields and server errors
 - [ ] 3.4 Runs list with filters (OBS-01); verify component test

@@ -277,12 +277,14 @@ Behind TLS one endpoint serves both.
 ### Sign in and connect an agent locally
 
 The API accepts bearer tokens from any OIDC provider ([ADR-0014](docs/adr/0014-people-authentication-with-oidc.md)).
-Locally, `dotnet user-jwts` signs them; `appsettings.Development.json` maps its `role` claim to Baton roles.
+Locally, `docker compose up -d` also starts Keycloak with a `baton` realm ([ADR-0017](docs/adr/0017-keycloak-as-development-identity-provider.md)):
+sign in to the console as `viewer`, `operator` or `admin` (password = user name). For scripts, `dotnet user-jwts`
+signs tokens too; `appsettings.Development.json` maps the `roles` claim values `baton.viewer|operator|admin` to Baton roles.
 Agents authenticate with a token issued for their host group ([ADR-0013](docs/adr/0013-agent-authentication.md)).
 
 ```bash
 # 1. An Admin token for the API (the key lands in your user secrets, not the repo)
-dotnet user-jwts create --project src/Baton.ControlPlane.Api --role Admin --output token
+dotnet user-jwts create --project src/Baton.ControlPlane.Api --claim roles=baton.admin --output token
 
 # 2. Create a host group and issue an agent token for it ($JWT = the token above)
 curl -H "Authorization: Bearer $JWT" -H "Content-Type: application/json"      -d '{"name":"default","maxConcurrentTasks":8}' http://localhost:5100/api/host-groups
