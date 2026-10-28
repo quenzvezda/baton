@@ -65,6 +65,24 @@ public sealed class AutomationEditorTests
     }
 
     [Fact]
+    public void Manual_trigger_can_be_added_once_and_is_sent_with_its_kind()
+    {
+        using var ctx = new ConsoleContext(Roles.Operator);
+        SampleData.AddWorkflow(ctx.Api);
+        var cut = ctx.Render<AutomationEditor>();
+        cut.Find("#name").Change("Ad hoc");
+        cut.Find("#workflow").Change(SampleData.WorkflowKey);
+        cut.Find("#group").Change(SampleData.Group.Id.ToString());
+        cut.Find("#param-region").Change("EU");
+
+        cut.FindAll("button").Single(b => b.TextContent == "Add manual trigger").Click();
+        Assert.DoesNotContain(cut.FindAll("button"), b => b.TextContent == "Add manual trigger");
+        cut.Find("form.editor").Submit();
+
+        Assert.Equal(["manual"], Assert.Single(ctx.Api.SavedRequests).Triggers!.Select(t => t.Kind));
+    }
+
+    [Fact]
     public void Server_error_is_shown_next_to_its_field_and_other_inputs_are_kept()
     {
         using var ctx = new ConsoleContext(Roles.Operator);

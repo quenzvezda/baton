@@ -143,6 +143,10 @@ else
                             <FieldError Text="@Error($"triggers[{index}].timeZone")" />
                         </div>
                     }
+                    else if (trigger.Kind == "manual")
+                    {
+                        <span class="muted">Runs only when someone presses Run now.</span>
+                    }
                     else if (trigger.WebhookUrl is not null)
                     {
                         <span class="muted">POST <code>@trigger.WebhookUrl</code></span>
@@ -158,6 +162,10 @@ else
             <div class="toolbar">
                 <button type="button" @onclick="@(() => _draft.Triggers.Add(new TriggerDraft { Kind = "cron", TimeZone = "UTC" }))">Add cron trigger</button>
                 <button type="button" @onclick="@(() => _draft.Triggers.Add(new TriggerDraft { Kind = "webhook" }))">Add webhook trigger</button>
+                @if (!_draft.Triggers.Any(t => t.Kind == "manual"))
+                {
+                    <button type="button" @onclick="@(() => _draft.Triggers.Add(new TriggerDraft { Kind = "manual" }))">Add manual trigger</button>
+                }
             </div>
         </fieldset>
 
