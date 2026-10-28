@@ -1,5 +1,6 @@
 using System.Text;
 using Baton.Persistence.Entities;
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions;
 
@@ -10,7 +11,7 @@ namespace Baton.Persistence;
 /// does NOT go through EF — see <c>Queue/</c> and ADR-0007. Run, task and history tables are created by
 /// raw SQL in the baseline migration and are not part of this model.
 /// </summary>
-public sealed class BatonDbContext(DbContextOptions<BatonDbContext> options) : DbContext(options)
+public sealed class BatonDbContext(DbContextOptions<BatonDbContext> options) : DbContext(options), IDataProtectionKeyContext
 {
     public DbSet<WorkflowDefinitionEntity> WorkflowDefinitions => Set<WorkflowDefinitionEntity>();
     public DbSet<HostGroupEntity> HostGroups => Set<HostGroupEntity>();
@@ -19,6 +20,9 @@ public sealed class BatonDbContext(DbContextOptions<BatonDbContext> options) : D
     public DbSet<AutomationEntity> Automations => Set<AutomationEntity>();
     public DbSet<AutomationTriggerEntity> AutomationTriggers => Set<AutomationTriggerEntity>();
     public DbSet<ConcurrencyLimitEntity> ConcurrencyLimits => Set<ConcurrencyLimitEntity>();
+
+    /// <summary>The Data Protection key ring that encrypts webhook secrets (ADR-0015).</summary>
+    public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {

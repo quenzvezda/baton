@@ -27,13 +27,14 @@ and fenced leases keep a stale worker from ever overwriting a newer result.
 ---
 
 > [!NOTE]
-> **Project status: M0, M1, M2 and M3 done, M4 next.** The design, the architecture decisions and
-> the specifications for every v1 milestone are complete. The schema, test harness and CI are in
-> place, and workflows written in C# are validated, versioned, registered and listed by the
+> **Project status: M0–M4 done, M5 next; the v1 backend is complete.** The design, the architecture
+> decisions and the specifications for every v1 milestone are complete. The schema, test harness and
+> CI are in place, and workflows written in C# are validated, versioned, registered and listed by the
 > catalog API. Agents register, heartbeat and drain with group-scoped credentials, and people sign
 > in with OIDC roles. Ready tasks are dispatched to eligible agents under fenced leases, and lost or
-> failed attempts are retried elsewhere. Engine behavior is being built milestone by milestone, spec
-> first. See [Roadmap](#roadmap).
+> failed attempts are retried elsewhere. Automations fire on cron, Run now and signed webhooks; runs
+> are admitted under limits, time out and can be cancelled. The web console comes next. See
+> [Roadmap](#roadmap).
 
 ## Why Baton?
 
@@ -230,7 +231,7 @@ mapped to a milestone.
 | **M1** | [Workflow definitions](docs/milestones/M1-workflow-definitions.md) | Builder, DAG validation, hashing, registration | ✅ Done |
 | **M2** | [Host registry](docs/milestones/M2-host-registry.md) | Agent registration, heartbeats, drain, access control | ✅ Done |
 | **M3** | [Task dispatch & leases](docs/milestones/M3-task-dispatch.md) | Claims, fencing, reaper, retries | ✅ Done |
-| **M4** | [Automations & run lifecycle](docs/milestones/M4-automations-and-run-lifecycle.md) | Triggers, admission, limits, cancellation | 📝 Specified |
+| **M4** | [Automations & run lifecycle](docs/milestones/M4-automations-and-run-lifecycle.md) | Triggers, admission, limits, cancellation | ✅ Done |
 | **M5** | [Web console & monitoring](docs/milestones/M5-web-console-and-monitoring.md) | Catalog, runs, DAG view, live logs, hosts | 📝 Specified |
 | **G1** | [v1 production readiness](docs/milestones/G1-v1-production-readiness.md) | Load, chaos and security gate | — |
 | M6–M8 | [Phase 2 & 3](ROADMAP.md) | Aging, pinned runs, audit log, re-run from failure, OTel, extensibility | Planned |
@@ -294,6 +295,25 @@ dotnet run --project src/Baton.Agent
 # 4. The host is Online; drain/undrain it, stop the agent and it shows Draining, then Offline 30 s later
 curl -H "Authorization: Bearer $JWT" http://localhost:5100/api/hosts
 curl -X POST -H "Authorization: Bearer $JWT" http://localhost:5100/api/hosts/<host-id>/drain
+```
+
+### Run an automation
+
+With an agent connected (above) and an Operator or Admin token, create an automation for a workflow registered
+from `src/Baton.Definitions` (`GET /api/workflows` lists them; `parameters` must match its schema) and run it. The response's `ETag` is what `If-Match` needs for an update; a webhook trigger's secret is shown only
+in the response that created it.
+
+```bash
+curl -H "Authorization: Bearer $JWT" -H "Content-Type: application/json" http://localhost:5100/api/automations      -d '{"name":"hourly report","workflowKey":"<workflow-key>","hostGroupId":"<group-id>",
+          "parameters":{"region":"apac"},"concurrencyPolicy":"skip",
+          "triggers":[{"kind":"cron","cronExpression":"0 * * * *","timeZone":"UTC"},{"kind":"webhook"}]}'
+curl -X POST -H "Authorization: Bearer $JWT" http://localhost:5100/api/automations/<automation-id>/runs   # Run now
+curl -X POST -H "Authorization: Bearer $JWT" http://localhost:5100/api/runs/<run-id>/cancel
+
+# A webhook delivery: HMAC-SHA256 of the raw body with the trigger's secret, and a delivery id for retries
+body='{"event":"orders.closed"}'
+sig=$(printf '%s' "$body" | openssl dgst -sha256 -hmac "$SECRET" | sed 's/^.* //')
+curl -H "X-Signature: sha256=$sig" -H "X-Delivery-Id: $(uuidgen)" -d "$body" http://localhost:5100/api/webhooks/<trigger-id>
 ```
 
 Telemetry (traces, metrics, logs) is exported over OTLP only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set,

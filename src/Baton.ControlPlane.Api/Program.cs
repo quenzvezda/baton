@@ -12,8 +12,6 @@ builder.Services.AddBatonPersistence(builder.Configuration.GetConnectionString("
 builder.Services.AddWorkflows(typeof(DefinitionsAssembly).Assembly);
 builder.Services.AddControlPlane(builder.Configuration);
 
-// M4: automations, triggers, Run now, webhooks.
-
 var app = builder.Build();
 
 // Refuses to start on an invalid definition or a changed graph under a registered key@version (WF-03, WF-04).

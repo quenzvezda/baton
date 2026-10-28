@@ -37,4 +37,7 @@ public sealed class AutomationEntity
 
     /// <summary>Optimistic concurrency token for the editor.</summary>
     public int RowVersion { get; set; }
+
+    /// <summary>Soft delete (M4 design.md decision 5): runs keep referring to the automation.</summary>
+    public DateTimeOffset? DeletedAt { get; set; }
 }

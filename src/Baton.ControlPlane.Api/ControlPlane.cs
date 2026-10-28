@@ -1,6 +1,10 @@
+using Baton.ControlPlane.Api.Automations;
 using Baton.ControlPlane.Api.Hosts;
+using Baton.ControlPlane.Api.Runs;
 using Baton.ControlPlane.Api.Security;
 using Baton.ControlPlane.Api.Workflows;
+using Baton.Persistence;
+using Microsoft.AspNetCore.DataProtection;
 
 namespace Baton.ControlPlane.Api;
 
@@ -14,6 +18,11 @@ public static class ControlPlane
     {
         services.AddProblemDetails();
         services.AddBatonSecurity(configuration);
+
+        // Webhook secrets (ADR-0015): one key ring in Postgres for every replica. Encrypting the key ring at
+        // rest (certificate, Key Vault) is configured per deployment.
+        services.AddDataProtection().SetApplicationName("baton").PersistKeysToDbContext<BatonDbContext>();
+        services.AddSingleton<WebhookSecrets>();
         return services;
     }
 
@@ -21,8 +30,12 @@ public static class ControlPlane
     {
         app.MapGet("/healthz", () => Results.Ok(new { status = "ok", service = "control-plane-api" })).AllowAnonymous();
         app.MapWorkflowCatalog();
+        app.MapWorkflowLimits();
         app.MapHostGroups();
         app.MapHosts();
+        app.MapAutomations();
+        app.MapWebhooks();
+        app.MapRuns();
         return app;
     }
 }

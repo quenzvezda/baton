@@ -33,6 +33,10 @@ public static class PersistenceServiceCollectionExtensions
         services.AddSingleton<TaskLeases>();
         services.AddSingleton<LeaseReaper>();
         services.AddSingleton<RetryPromoter>();
+        services.AddSingleton<RunCreator>();
+        services.AddSingleton<RunCancellation>();
+        services.AddSingleton<CronTriggers>();
+        services.AddSingleton<RunAdmission>();
         return services;
     }
 

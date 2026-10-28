@@ -25,9 +25,11 @@ public static class AgentProtocol
         return services;
     }
 
-    /// <summary>The M3 loops (design spec §8 "Orchestrator loops").</summary>
+    /// <summary>The M3 dispatch and M4 run-lifecycle loops (design spec §8 "Orchestrator loops").</summary>
     public static IServiceCollection AddDispatchLoops(this IServiceCollection services)
     {
+        services.AddHostedService<TriggerLoop>();
+        services.AddHostedService<AdmissionLoop>();
         services.AddHostedService<ReaperLoop>();
         services.AddHostedService<RetryPromoterLoop>();
         services.AddHostedService<LimitReconcilerLoop>();

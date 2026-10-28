@@ -4,9 +4,9 @@ Each loop is a `BackgroundService` (design spec §8, ADR-0008).
 
 | Loop | Interval | Coordination | Milestone |
 | --- | --- | --- | --- |
-| TriggerLoop | 1 s | `SKIP LOCKED` | M4 |
-| AdmissionLoop | 1 s | advisory lock per group | M4 |
-| ReaperLoop | 5 s | `SKIP LOCKED` | M3 |
+| TriggerLoop | 1 s | `SKIP LOCKED` (trigger and automation rows) | M4 |
+| AdmissionLoop | 1 s | advisory lock per group; one transaction per run | M4 |
+| ReaperLoop | 5 s | `SKIP LOCKED` (M4: cancel grace, run deadlines) | M3 |
 | RetryPromoterLoop | 1 s | `SKIP LOCKED` | M3 |
 | AgingLoop | 30 s | singleton (advisory lock) | M6 |
 | LimitReconcilerLoop | 5 min | singleton (advisory lock) | M3 |

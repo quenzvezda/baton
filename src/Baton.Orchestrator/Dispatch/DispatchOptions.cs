@@ -19,4 +19,9 @@ public sealed class DispatchOptions
     public TimeSpan RetryPromoterInterval { get; set; } = TimeSpan.FromSeconds(1);
 
     public TimeSpan LimitReconcilerInterval { get; set; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>Due cron triggers (M4, NFR-TriggerAccuracy: a run within 5 s of the fire time).</summary>
+    public TimeSpan TriggerInterval { get; set; } = TimeSpan.FromSeconds(1);
+
+    public TimeSpan AdmissionInterval { get; set; } = TimeSpan.FromSeconds(1);
 }

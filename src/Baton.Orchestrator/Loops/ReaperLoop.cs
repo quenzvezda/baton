@@ -7,6 +7,8 @@ namespace Baton.Orchestrator.Loops;
 /// <summary>
 /// Every 5 s (ORC-09, WF-05): closes expired leases as Lost, attempts running past their timeout plus
 /// 60 s as timed out, and persists Offline for hosts that stopped heartbeating (M2 design.md decision 9).
+/// Since M4 it also closes cancelled attempts past the 30 s grace (ORC-11) and cancels runs past their
+/// deadline (AUT-09).
 /// </summary>
 public sealed partial class ReaperLoop(LeaseReaper reaper, IOptions<DispatchOptions> options, ILogger<ReaperLoop> logger)
     : PeriodicLoop(logger)
@@ -20,7 +22,17 @@ public sealed partial class ReaperLoop(LeaseReaper reaper, IOptions<DispatchOpti
             LogReaped(Logger, summary.Lost, summary.TimedOut);
         if (summary.HostsMarkedOffline > 0)
             LogOffline(Logger, summary.HostsMarkedOffline);
+        if (summary.CancelledAfterGrace > 0)
+            LogCancelGrace(Logger, summary.CancelledAfterGrace);
+        if (summary.RunsTimedOut > 0)
+            LogRunsTimedOut(Logger, summary.RunsTimedOut);
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Closed {Count} cancelled attempts whose handler ignored the cancellation")]
+    private static partial void LogCancelGrace(ILogger logger, int count);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Cancelling {Count} runs past their deadline")]
+    private static partial void LogRunsTimedOut(ILogger logger, int count);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Reaped {Lost} lost and {TimedOut} timed-out attempts")]
     private static partial void LogReaped(ILogger logger, int lost, int timedOut);

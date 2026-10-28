@@ -80,6 +80,10 @@ namespace Baton.Persistence.Migrations
                         .HasColumnName("concurrency_policy")
                         .HasDefaultValueSql("'skip'");
 
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
                     b.Property<string>("Description")
                         .HasColumnType("text")
                         .HasColumnName("description");
@@ -161,7 +165,8 @@ namespace Baton.Persistence.Migrations
 
                     b.HasIndex("Name")
                         .IsUnique()
-                        .HasDatabaseName("automations_name_key");
+                        .HasDatabaseName("automations_name_key")
+                        .HasFilter("deleted_at IS NULL");
 
                     b.ToTable("automations", null, t =>
                         {
@@ -216,9 +221,9 @@ namespace Baton.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("time_zone");
 
-                    b.Property<byte[]>("WebhookSecretHash")
+                    b.Property<byte[]>("WebhookSecret")
                         .HasColumnType("bytea")
-                        .HasColumnName("webhook_secret_hash");
+                        .HasColumnName("webhook_secret");
 
                     b.HasKey("Id")
                         .HasName("automation_triggers_pkey");
@@ -431,6 +436,29 @@ namespace Baton.Persistence.Migrations
                         .HasDatabaseName("workflow_definitions_key_version_key");
 
                     b.ToTable("workflow_definitions", (string)null);
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("FriendlyName")
+                        .HasColumnType("text")
+                        .HasColumnName("friendly_name");
+
+                    b.Property<string>("Xml")
+                        .HasColumnType("text")
+                        .HasColumnName("xml");
+
+                    b.HasKey("Id")
+                        .HasName("data_protection_keys_pkey");
+
+                    b.ToTable("data_protection_keys", (string)null);
                 });
 
             modelBuilder.Entity("Baton.Persistence.Entities.AgentCredentialEntity", b =>
