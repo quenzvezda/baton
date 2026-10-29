@@ -27,14 +27,14 @@ and fenced leases keep a stale worker from ever overwriting a newer result.
 ---
 
 > [!NOTE]
-> **Project status: M0–M4 done, M5 next; the v1 backend is complete.** The design, the architecture
+> **Project status: M0–M5 done, phase 1 complete; Gate G1 next.** The design, the architecture
 > decisions and the specifications for every v1 milestone are complete. The schema, test harness and
 > CI are in place, and workflows written in C# are validated, versioned, registered and listed by the
 > catalog API. Agents register, heartbeat and drain with group-scoped credentials, and people sign
 > in with OIDC roles. Ready tasks are dispatched to eligible agents under fenced leases, and lost or
 > failed attempts are retried elsewhere. Automations fire on cron, Run now and signed webhooks; runs
-> are admitted under limits, time out and can be cancelled. The web console comes next. See
-> [Roadmap](#roadmap).
+> are admitted under limits, time out and can be cancelled. A Blazor console lets people browse
+> workflows, edit automations, and follow runs, task graphs and logs live. See [Roadmap](#roadmap).
 
 ## Why Baton?
 
@@ -232,7 +232,7 @@ mapped to a milestone.
 | **M2** | [Host registry](docs/milestones/M2-host-registry.md) | Agent registration, heartbeats, drain, access control | ✅ Done |
 | **M3** | [Task dispatch & leases](docs/milestones/M3-task-dispatch.md) | Claims, fencing, reaper, retries | ✅ Done |
 | **M4** | [Automations & run lifecycle](docs/milestones/M4-automations-and-run-lifecycle.md) | Triggers, admission, limits, cancellation | ✅ Done |
-| **M5** | [Web console & monitoring](docs/milestones/M5-web-console-and-monitoring.md) | Catalog, runs, DAG view, live logs, hosts | 🚧 In review |
+| **M5** | [Web console & monitoring](docs/milestones/M5-web-console-and-monitoring.md) | Catalog, runs, DAG view, live logs, hosts | ✅ Done |
 | **G1** | [v1 production readiness](docs/milestones/G1-v1-production-readiness.md) | Load, chaos and security gate | — |
 | M6–M8 | [Phase 2 & 3](ROADMAP.md) | Aging, pinned runs, audit log, re-run from failure, OTel, extensibility | Planned |
 
