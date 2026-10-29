@@ -1,0 +1,8 @@
+@if (!string.IsNullOrEmpty(Text))
+{
+    <span class="field-error" role="alert">@Text</span>
+}
+
+@code {
+    [Parameter] public string? Text { get; set; }
+}

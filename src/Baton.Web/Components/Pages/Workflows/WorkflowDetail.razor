@@ -1,0 +1,129 @@
+@page "/workflows/{Key}"
+@inject IBatonApi Api
+@inject NavigationManager Navigation
+
+<PageTitle>@Key · Workflows · Baton</PageTitle>
+
+<p class="crumbs"><a href="workflows">Workflows</a> /</p>
+<ErrorMessage Text="@_error" />
+@if (_notFound)
+{
+    <h1>@Key</h1>
+    <p>No workflow is registered under this key@(Version is null ? "" : $" and version {Version}").</p>
+}
+else if (_detail is null)
+{
+    <h1>@Key</h1>
+    <p class="muted">Loading…</p>
+}
+else
+{
+    <h1>@_detail.DisplayName</h1>
+    <div class="toolbar">
+        <code>@_detail.Key</code>
+        <label>
+            Version
+            <select value="@_detail.Version" @onchange="SelectVersion" aria-label="Version">
+                @foreach (var version in _detail.Versions.OrderDescending())
+                {
+                    <option value="@version">v@(version)@(version == _detail.Versions.Max() ? " (latest)" : "")</option>
+                }
+            </select>
+        </label>
+        @if (_detail.IsRetired)
+        {
+            <span class="badge state-skipped">retired</span>
+        }
+        <span class="muted">registered <Moment Value="_detail.RegisteredAt" /></span>
+    </div>
+
+    <h2>Tasks</h2>
+    <DagView Graph="_detail.Graph" />
+
+    <h2>Parameters</h2>
+    @if (!_form!.IsSupported)
+    {
+        <p class="muted">The parameters are edited as JSON.</p>
+    }
+    else if (_form.Fields.Count == 0)
+    {
+        <p class="muted">This workflow takes no parameters.</p>
+    }
+    else
+    {
+        <table class="grid params">
+            <thead><tr><th>Name</th><th>Type</th><th>Required</th><th>Default</th></tr></thead>
+            <tbody>
+                @foreach (var field in _form.Fields)
+                {
+                    <tr data-param="@field.Name">
+                        <td><code>@field.Name</code></td>
+                        <td>@TypeText(field)</td>
+                        <td>@(field.Required ? "required" : "optional")</td>
+                        <td>@(field.Default is null ? "—" : field.Default.ToJsonString())</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+    <details>
+        <summary>JSON Schema</summary>
+        <JsonBlock Value="_detail.ParamsSchema" />
+    </details>
+}
+
+@code {
+    private WorkflowVersionDetail? _detail;
+    private ParameterForm? _form;
+    private bool _notFound;
+    private string? _error;
+
+    [Parameter] public string Key { get; set; } = "";
+
+    [SupplyParameterFromQuery] public int? Version { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _error = null;
+        _notFound = false;
+        try
+        {
+            var version = Version;
+            if (version is null)
+            {
+                var summary = (await Api.ListWorkflowsAsync()).SingleOrDefault(w => w.Key == Key);
+                if (summary is null)
+                {
+                    _notFound = true;
+                    return;
+                }
+                version = summary.LatestVersion;
+            }
+
+            _detail = await Api.GetWorkflowVersionAsync(Key, version.Value);
+            _notFound = _detail is null;
+            if (_detail is not null)
+                _form = ParameterForm.FromSchema(_detail.ParamsSchema);
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private void SelectVersion(ChangeEventArgs e) =>
+        Navigation.NavigateTo($"workflows/{Uri.EscapeDataString(Key)}?version={e.Value}");
+
+    private static string TypeText(ParameterField field) => field.Kind switch
+    {
+        FieldKind.Text => "text",
+        FieldKind.WholeNumber => "whole number",
+        FieldKind.Number => "number",
+        FieldKind.Boolean => "yes/no",
+        FieldKind.Choice => "one of " + string.Join(", ", field.Choices.Select(ParameterForm.ChoiceText)),
+        FieldKind.Date => "date",
+        FieldKind.DateTime => "date and time",
+        FieldKind.TextList => "list of text",
+        _ => "JSON",
+    } + (field.Nullable ? " or empty" : "");
+}

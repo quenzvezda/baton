@@ -1,0 +1,202 @@
+@page "/runs/{Id:guid}"
+@implements IDisposable
+@inject IBatonApi Api
+@inject UserSession Session
+
+<PageTitle>Run @Id.ToString()[..8] · Baton</PageTitle>
+
+<p class="crumbs"><a href="runs">Runs</a> /</p>
+<ErrorMessage Text="@_error" />
+@if (_notFound)
+{
+    <h1>Run not available</h1>
+    <p>This run does not exist, or it finished more than 90 days ago and was purged.</p>
+}
+else if (_run is null)
+{
+    <h1>Run</h1>
+    <p class="muted">Loading…</p>
+}
+else
+{
+    <div class="page-head">
+        <h1>Run <code>@_run.Id.ToString()[..8]</code> <StatusBadge Status="@_run.Status" /></h1>
+        @if (_canOperate && _run.Status is "pending" or "running")
+        {
+            <button type="button" class="danger" disabled="@_busy" @onclick="CancelAsync">Cancel run</button>
+        }
+    </div>
+    <dl class="facts">
+        <dt>Workflow</dt>
+        <dd><a href="@($"workflows/{Uri.EscapeDataString(_run.WorkflowKey)}?version={_run.WorkflowVersion}")"><code>@_run.WorkflowKey</code>@@@_run.WorkflowVersion</a></dd>
+        <dt>Automation</dt>
+        <dd>@if (_run.AutomationId is { } automationId)
+            {
+                <a href="@($"automations/{automationId}")">@(_run.AutomationName ?? automationId.ToString())</a>
+            }
+            else
+            {
+                <span class="muted">—</span>
+            }</dd>
+        <dt>Trigger</dt>
+        <dd>@_run.TriggerKind</dd>
+        <dt>Host group</dt>
+        <dd>@_run.HostGroupName</dd>
+        <dt>Created</dt>
+        <dd><Moment Value="_run.CreatedAt" /></dd>
+        <dt>Started</dt>
+        <dd><Moment Value="_run.StartedAt" /></dd>
+        <dt>Finished</dt>
+        <dd><Moment Value="_run.FinishedAt" /></dd>
+        @if (_run.CancelReason is not null)
+        {
+            <dt>Cancelled by</dt>
+            <dd>@_run.CancelReason</dd>
+        }
+        @if (_run.BlockedOn is not null && _run.Status == "pending")
+        {
+            <dt>Waiting for</dt>
+            <dd><code>@_run.BlockedOn</code></dd>
+        }
+    </dl>
+
+    <h2>Tasks</h2>
+    <DagView Graph="_run.Graph" States="_states" Selected="@_selectedKey" OnSelect="SelectTask" />
+
+    @if (SelectedTask is { } task)
+    {
+        <section class="task-panel" aria-label="@($"Task {task.Key}")" data-task="@task.Key">
+            <h3><code>@task.Key</code> <StatusBadge Status="@task.Status" /></h3>
+            <p class="muted">attempt @task.Attempt of @task.MaxAttempts</p>
+            @if (task.Attempts.Count > 0)
+            {
+                <table class="grid attempts">
+                    <thead><tr><th>Attempt</th><th>Host</th><th>Started</th><th>Finished</th><th>Outcome</th><th>Error</th></tr></thead>
+                    <tbody>
+                        @foreach (var attempt in task.Attempts)
+                        {
+                            <tr class="@(attempt.Attempt == _selectedAttempt ? "selected" : "")" data-attempt="@attempt.Attempt">
+                                <td><button type="button" class="link" @onclick="() => _selectedAttempt = attempt.Attempt">#@attempt.Attempt</button></td>
+                                <td>@(attempt.HostName ?? attempt.HostId.ToString()[..8])</td>
+                                <td><Moment Value="attempt.StartedAt" /></td>
+                                <td><Moment Value="attempt.FinishedAt" /></td>
+                                <td>@if (attempt.Outcome is { } outcome) { <StatusBadge Status="@outcome" /> } else { <StatusBadge Status="running" /> }</td>
+                                <td class="error-text">@ErrorText(attempt.Error)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            @if (task.Error is { } error)
+            {
+                <h4>Error</h4>
+                <p class="error-text">@ErrorText(error)</p>
+                <details><summary>Details</summary><JsonBlock Value="error" /></details>
+            }
+            @if (task.Output is not null)
+            {
+                <h4>Output</h4>
+                <JsonBlock Value="task.Output" />
+            }
+            @if (_selectedAttempt > 0)
+            {
+                <LogViewer RunId="_run.Id" TaskKey="@task.Key" Attempt="_selectedAttempt" OnFinished="RefreshAsync" />
+            }
+        </section>
+    }
+
+    <details>
+        <summary>Parameters</summary>
+        <JsonBlock Value="_run.Parameters" />
+    </details>
+}
+
+@code {
+    /// <summary>How often an active run's state is re-read; logs stream on their own.</summary>
+    private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(3);
+
+    private RunDetail? _run;
+    private Dictionary<string, string> _states = [];
+    private string? _selectedKey;
+    private int _selectedAttempt;
+    private bool _notFound;
+    private bool _canOperate;
+    private bool _busy;
+    private string? _error;
+    private Timer? _timer;
+
+    [Parameter] public Guid Id { get; set; }
+
+    private TaskRun? SelectedTask => _run?.Tasks.SingleOrDefault(t => t.Key == _selectedKey);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _canOperate = await Session.HasRoleAsync(Roles.Operator);
+        await RefreshAsync();
+        // Open the first failed task, else the first running one, so the interesting part is on screen.
+        var focus = _run?.Tasks.FirstOrDefault(t => t.Status == "failed")
+            ?? _run?.Tasks.FirstOrDefault(t => t.Status is "running" or "leased");
+        if (focus is not null && _selectedKey is null)
+            SelectTask(focus.Key);
+        _timer ??= new Timer(_ => _ = InvokeAsync(TickAsync), null, RefreshInterval, RefreshInterval);
+    }
+
+    private async Task TickAsync()
+    {
+        if (_run is null || IsFinal(_run.Status) || _busy)
+            return;
+        await RefreshAsync();
+        StateHasChanged();
+    }
+
+    private async Task RefreshAsync()
+    {
+        try
+        {
+            _run = await Api.GetRunAsync(Id);
+            _notFound = _run is null;
+            _states = _run?.Tasks.ToDictionary(t => t.Key, t => t.Status) ?? [];
+            _error = null;
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private void SelectTask(string key)
+    {
+        _selectedKey = key;
+        _selectedAttempt = _run?.Tasks.SingleOrDefault(t => t.Key == key)?.Attempt ?? 0;
+    }
+
+    private async Task CancelAsync()
+    {
+        _busy = true;
+        try
+        {
+            await Api.CancelRunAsync(Id);
+            await RefreshAsync();
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static bool IsFinal(string status) => status is "succeeded" or "failed" or "cancelled" or "timed_out";
+
+    private static string? ErrorText(JsonElement? error) =>
+        error is { ValueKind: JsonValueKind.Object } e
+            ? string.Join(": ", new[] { Prop(e, "type"), Prop(e, "message") }.Where(s => !string.IsNullOrEmpty(s)))
+            : error?.ToString();
+
+    private static string? Prop(JsonElement element, string name) =>
+        element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+
+    public void Dispose() => _timer?.Dispose();
+}

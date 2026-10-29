@@ -1,0 +1,436 @@
+@page "/automations/new"
+@page "/automations/{Id:guid}"
+@inject IBatonApi Api
+@inject UserSession Session
+@inject NavigationManager Navigation
+
+<PageTitle>@(_isNew ? "New automation" : _draft.Name) · Automations · Baton</PageTitle>
+
+<p class="crumbs"><a href="automations">Automations</a> /</p>
+<h1>@(_isNew ? "New automation" : _saved?.Name ?? "Automation")</h1>
+<ErrorMessage Text="@_error" />
+@if (_notFound)
+{
+    <p>This automation does not exist or was deleted.</p>
+}
+else if (!_loaded)
+{
+    <p class="muted">Loading…</p>
+}
+else
+{
+    @if (!_isNew && _saved is not null)
+    {
+        <div class="toolbar">
+            <StatusBadge Status="@(_saved.Enabled ? "enabled" : "disabled")" />
+            <span class="muted">owner @_saved.Owner · updated <Moment Value="_saved.UpdatedAt" /></span>
+            <a href="@($"runs?automationId={_saved.Id}")">Runs</a>
+            @if (_canOperate)
+            {
+                <button type="button" disabled="@(_busy || !_saved.Enabled)" @onclick="RunNowAsync">Run now</button>
+                <button type="button" disabled="@_busy" @onclick="ToggleAsync">@(_saved.Enabled ? "Disable" : "Enable")</button>
+                @if (_confirmDelete)
+                {
+                    <button type="button" class="danger" disabled="@_busy" @onclick="DeleteAsync">Confirm delete</button>
+                    <button type="button" @onclick="() => _confirmDelete = false">Keep</button>
+                }
+                else
+                {
+                    <button type="button" class="danger" @onclick="() => _confirmDelete = true">Delete…</button>
+                }
+            }
+        </div>
+    }
+    @if (_message is not null)
+    {
+        <p class="notice" role="status">@_message</p>
+    }
+    @foreach (var secret in _issuedSecrets)
+    {
+        <p class="notice" role="status">Webhook secret (shown once, store it now): <code>@secret</code></p>
+    }
+
+    <form class="editor" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+        @if (_otherErrors.Count > 0)
+        {
+            <ul class="error" role="alert">
+                @foreach (var (key, message) in _otherErrors)
+                {
+                    <li><code>@key</code>: @message</li>
+                }
+            </ul>
+        }
+        <fieldset disabled="@(!_canOperate)">
+            <legend>Automation</legend>
+            <div class="field@Invalid("name")">
+                <label for="name">Name <span class="required">*</span></label>
+                <input id="name" @bind="_draft.Name" required maxlength="200" />
+                <FieldError Text="@Error("name")" />
+            </div>
+            <div class="field@Invalid("description")">
+                <label for="description">Description</label>
+                <textarea id="description" rows="2" @bind="_draft.Description"></textarea>
+                <FieldError Text="@Error("description")" />
+            </div>
+            <div class="row">
+                <div class="field@Invalid("workflowKey")">
+                    <label for="workflow">Workflow <span class="required">*</span></label>
+                    <select id="workflow" value="@_draft.WorkflowKey" @onchange="WorkflowChangedAsync">
+                        <option value="">Choose…</option>
+                        @foreach (var workflow in _workflows)
+                        {
+                            <option value="@workflow.Key">@workflow.DisplayName (@workflow.Key)</option>
+                        }
+                    </select>
+                    <FieldError Text="@Error("workflowKey")" />
+                </div>
+                <div class="field@Invalid("workflowVersion")">
+                    <label for="version">Version</label>
+                    <select id="version" value="@(_draft.WorkflowVersion?.ToString() ?? "")" @onchange="VersionChangedAsync">
+                        <option value="">Follow latest</option>
+                        @foreach (var version in _versions.OrderDescending())
+                        {
+                            <option value="@version">v@(version)</option>
+                        }
+                    </select>
+                    <FieldError Text="@Error("workflowVersion")" />
+                </div>
+                <div class="field@Invalid("hostGroupId")">
+                    <label for="group">Host group <span class="required">*</span></label>
+                    <select id="group" @bind="_draft.HostGroupId">
+                        <option value="">Choose…</option>
+                        @foreach (var group in _groups)
+                        {
+                            <option value="@group.Id">@group.Name</option>
+                        }
+                    </select>
+                    <FieldError Text="@Error("hostGroupId")" />
+                </div>
+            </div>
+        </fieldset>
+
+        <fieldset disabled="@(!_canOperate)">
+            <legend>Parameters</legend>
+            @if (_form is null)
+            {
+                <p class="muted">Choose a workflow to see its parameters.</p>
+            }
+            else
+            {
+                <ParameterEditor Form="_form" Errors="_paramErrors" Disabled="!_canOperate" />
+            }
+        </fieldset>
+
+        <fieldset disabled="@(!_canOperate)">
+            <legend>Triggers</legend>
+            <FieldError Text="@Error("triggers")" />
+            @for (var i = 0; i < _draft.Triggers.Count; i++)
+            {
+                var index = i;
+                var trigger = _draft.Triggers[index];
+                <div class="trigger" data-trigger="@index">
+                    <strong>@trigger.Kind</strong>
+                    @if (trigger.Kind == "cron")
+                    {
+                        <div class="field@Invalid($"triggers[{index}].cronExpression")">
+                            <label for="@($"cron-{index}")">Cron expression</label>
+                            <input id="@($"cron-{index}")" @bind="trigger.CronExpression" placeholder="0 2 * * *" class="mono" />
+                            <FieldError Text="@Error($"triggers[{index}].cronExpression")" />
+                        </div>
+                        <div class="field@Invalid($"triggers[{index}].timeZone")">
+                            <label for="@($"tz-{index}")">Time zone</label>
+                            <input id="@($"tz-{index}")" @bind="trigger.TimeZone" placeholder="Europe/Amsterdam" />
+                            <FieldError Text="@Error($"triggers[{index}].timeZone")" />
+                        </div>
+                    }
+                    else if (trigger.Kind == "manual")
+                    {
+                        <span class="muted">Runs only when someone presses Run now.</span>
+                    }
+                    else if (trigger.WebhookUrl is not null)
+                    {
+                        <span class="muted">POST <code>@trigger.WebhookUrl</code></span>
+                    }
+                    else
+                    {
+                        <span class="muted">The URL and secret are shown after saving.</span>
+                    }
+                    <label class="check"><input type="checkbox" @bind="trigger.Enabled" /> Enabled</label>
+                    <button type="button" class="link" @onclick="() => _draft.Triggers.RemoveAt(index)">Remove</button>
+                </div>
+            }
+            <div class="toolbar">
+                <button type="button" @onclick="@(() => _draft.Triggers.Add(new TriggerDraft { Kind = "cron", TimeZone = "UTC" }))">Add cron trigger</button>
+                <button type="button" @onclick="@(() => _draft.Triggers.Add(new TriggerDraft { Kind = "webhook" }))">Add webhook trigger</button>
+                @if (!_draft.Triggers.Any(t => t.Kind == "manual"))
+                {
+                    <button type="button" @onclick="@(() => _draft.Triggers.Add(new TriggerDraft { Kind = "manual" }))">Add manual trigger</button>
+                }
+            </div>
+        </fieldset>
+
+        <fieldset disabled="@(!_canOperate)">
+            <legend>Limits</legend>
+            <div class="row">
+                <div class="field@Invalid("priority")">
+                    <label for="priority">Priority (0–100)</label>
+                    <input id="priority" type="number" min="0" max="100" @bind="_draft.Priority" />
+                    <FieldError Text="@Error("priority")" />
+                </div>
+                <div class="field@Invalid("maxConcurrentRuns")">
+                    <label for="max-runs">Max concurrent runs</label>
+                    <input id="max-runs" type="number" min="1" @bind="_draft.MaxConcurrentRuns" />
+                    <FieldError Text="@Error("maxConcurrentRuns")" />
+                </div>
+                <div class="field@Invalid("concurrencyPolicy")">
+                    <label for="policy">At the limit</label>
+                    <select id="policy" @bind="_draft.ConcurrencyPolicy">
+                        <option value="skip">Skip the new run</option>
+                        <option value="queue">Queue it</option>
+                        <option value="replace">Cancel the oldest, start it</option>
+                        <option value="allow">Allow it anyway</option>
+                    </select>
+                    <FieldError Text="@Error("concurrencyPolicy")" />
+                </div>
+            </div>
+            <div class="row">
+                <div class="field@Invalid("runTimeout")">
+                    <label for="timeout">Run timeout (hh:mm:ss)</label>
+                    <input id="timeout" @bind="_draft.RunTimeout" placeholder="none" class="mono" />
+                    <FieldError Text="@Error("runTimeout")" />
+                </div>
+                <div class="field@Invalid("requiredLabels")">
+                    <label for="labels">Required host labels</label>
+                    <input id="labels" @bind="_draft.RequiredLabels" placeholder="comma separated" />
+                    <FieldError Text="@Error("requiredLabels")" />
+                </div>
+            </div>
+        </fieldset>
+
+        @if (_canOperate)
+        {
+            <div class="toolbar">
+                <button type="submit" class="primary" disabled="@_busy">@(_isNew ? "Create automation" : "Save changes")</button>
+                <a href="automations">Cancel</a>
+            </div>
+        }
+    </form>
+}
+
+@code {
+    private readonly AutomationDraft _draft = new();
+    private readonly Dictionary<string, string> _errors = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _paramErrors = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _otherErrors = new(StringComparer.Ordinal);
+    private readonly List<string> _issuedSecrets = [];
+    private IReadOnlyList<WorkflowSummary> _workflows = [];
+    private IReadOnlyList<HostGroup> _groups = [];
+    private IReadOnlyList<int> _versions = [];
+    private ParameterForm? _form;
+    private Automation? _saved;
+    private bool _isNew;
+    private bool _loaded;
+    private bool _notFound;
+    private bool _canOperate;
+    private bool _busy;
+    private bool _confirmDelete;
+    private string? _error;
+    private string? _message;
+
+    [Parameter] public Guid? Id { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _isNew = Id is null;
+        _canOperate = await Session.HasRoleAsync(Roles.Operator);
+        try
+        {
+            _workflows = await Api.ListWorkflowsAsync();
+            _groups = await Api.ListHostGroupsAsync();
+            if (Id is { } id)
+            {
+                _saved = await Api.GetAutomationAsync(id);
+                if (_saved is null)
+                {
+                    _notFound = true;
+                    return;
+                }
+                _draft.Load(_saved);
+                await LoadSchemaAsync(_saved.Parameters);
+            }
+            _loaded = true;
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task WorkflowChangedAsync(ChangeEventArgs e)
+    {
+        _draft.WorkflowKey = e.Value?.ToString() ?? "";
+        _draft.WorkflowVersion = null;
+        await LoadSchemaAsync(CurrentParameters());
+    }
+
+    private async Task VersionChangedAsync(ChangeEventArgs e)
+    {
+        _draft.WorkflowVersion = int.TryParse(e.Value?.ToString(), out var version) ? version : null;
+        await LoadSchemaAsync(CurrentParameters());
+    }
+
+    /// <summary>Shows the chosen version's form (latest when following), keeping values of fields with the same name.</summary>
+    private async Task LoadSchemaAsync(JsonElement? parameters)
+    {
+        _form = null;
+        _versions = [];
+        var summary = _workflows.SingleOrDefault(w => w.Key == _draft.WorkflowKey);
+        if (summary is null)
+            return;
+
+        var detail = await Api.GetWorkflowVersionAsync(summary.Key, _draft.WorkflowVersion ?? summary.LatestVersion);
+        if (detail is null)
+            return;
+        _versions = detail.Versions;
+        _form = ParameterForm.FromSchema(detail.ParamsSchema);
+        _form.Load(parameters);
+    }
+
+    private JsonElement? CurrentParameters()
+    {
+        if (_form is null)
+            return null;
+        // Keep what can be converted; fields that cannot keep their default.
+        _form.TryBuild(out var built, out _);
+        return JsonSerializer.SerializeToElement(built);
+    }
+
+    private async Task SaveAsync()
+    {
+        ClearErrors();
+        if (_form is not null && !_form.TryBuild(out _, out var formErrors))
+        {
+            foreach (var (field, message) in formErrors)
+                _paramErrors[field] = message;
+            _error = "Some parameters need attention.";
+            return;
+        }
+        if (!_draft.TryBuild(_form, out var request, out var draftErrors))
+        {
+            foreach (var (field, message) in draftErrors)
+                _errors[field] = message;
+            _error = "Some fields need attention.";
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            var saved = _saved is null
+                ? await Api.CreateAutomationAsync(request)
+                : await Api.UpdateAutomationAsync(_saved.Id, _saved.Version, request);
+            _issuedSecrets.AddRange(saved.Triggers.Select(t => t.WebhookSecret).OfType<string>());
+            _saved = saved;
+            _draft.Load(saved);
+            _message = _isNew ? "Automation created." : "Changes saved.";
+            if (_isNew)
+            {
+                _isNew = false;
+                Navigation.NavigateTo($"automations/{saved.Id}", replace: true);
+            }
+        }
+        catch (ApiException ex)
+        {
+            MapServerErrors(ex);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>Puts each server message next to its field and keeps every input as typed (AUT-03).</summary>
+    private void MapServerErrors(ApiException ex)
+    {
+        _error = ex.Errors.Count > 0 ? "The server rejected some values." : ex.Message;
+        foreach (var (key, messages) in ex.Errors)
+        {
+            var message = string.Join(" ", messages);
+            if (ParameterForm.FieldOf(key) is { } param && _form?.Fields.Any(f => f.Name == param) == true)
+                _paramErrors[param] = _paramErrors.TryGetValue(param, out var existing) ? $"{existing} {message}" : message;
+            else if (key.Equals("parameters", StringComparison.OrdinalIgnoreCase) && _form?.IsSupported == false)
+                _paramErrors[""] = message;
+            else if (AutomationDraft.Fields.Contains(key) || key.StartsWith("triggers", StringComparison.Ordinal))
+                _errors[key] = message;
+            else
+                _otherErrors[key] = message;
+        }
+    }
+
+    private async Task RunNowAsync()
+    {
+        _busy = true;
+        try
+        {
+            var run = await Api.RunNowAsync(_saved!.Id);
+            Navigation.NavigateTo($"runs/{run.RunId}");
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task ToggleAsync()
+    {
+        _busy = true;
+        try
+        {
+            _saved = await Api.SetAutomationEnabledAsync(_saved!.Id, !_saved.Enabled);
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        _busy = true;
+        try
+        {
+            await Api.DeleteAutomationAsync(_saved!.Id, _saved.Version);
+            Navigation.NavigateTo("automations");
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+            _confirmDelete = false;
+        }
+    }
+
+    private void ClearErrors()
+    {
+        _error = null;
+        _message = null;
+        _errors.Clear();
+        _paramErrors.Clear();
+        _otherErrors.Clear();
+    }
+
+    private string? Error(string key) => _errors.GetValueOrDefault(key);
+
+    private string Invalid(string key) => _errors.ContainsKey(key) ? " invalid" : "";
+}

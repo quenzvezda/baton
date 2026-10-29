@@ -1,0 +1,185 @@
+@page "/runs"
+@inject IBatonApi Api
+
+<PageTitle>Runs · Baton</PageTitle>
+
+<h1>Runs</h1>
+<form class="filters" @onsubmit="ApplyAsync" @onsubmit:preventDefault aria-label="Filters">
+    <div class="field">
+        <label for="f-automation">Automation</label>
+        <select id="f-automation" @bind="_automationId">
+            <option value="">Any</option>
+            @foreach (var automation in _automations)
+            {
+                <option value="@automation.Id">@automation.Name</option>
+            }
+        </select>
+    </div>
+    <div class="field">
+        <label for="f-workflow">Workflow</label>
+        <select id="f-workflow" @bind="_workflowKey">
+            <option value="">Any</option>
+            @foreach (var workflow in _workflows)
+            {
+                <option value="@workflow.Key">@workflow.Key</option>
+            }
+        </select>
+    </div>
+    <div class="field">
+        <label for="f-group">Host group</label>
+        <select id="f-group" @bind="_hostGroupId">
+            <option value="">Any</option>
+            @foreach (var group in _groups)
+            {
+                <option value="@group.Id">@group.Name</option>
+            }
+        </select>
+    </div>
+    <div class="field">
+        <label for="f-from">Created from</label>
+        <input id="f-from" type="date" @bind="_from" />
+    </div>
+    <div class="field">
+        <label for="f-to">to (inclusive)</label>
+        <input id="f-to" type="date" @bind="_to" />
+    </div>
+    <fieldset class="statuses">
+        <legend>Status</legend>
+        @foreach (var status in AllStatuses)
+        {
+            <label class="check">
+                <input type="checkbox" data-status="@status" checked="@_statuses.Contains(status)" @onchange="e => ToggleStatus(status, e)" />
+                @StatusBadge.Text(status)
+            </label>
+        }
+    </fieldset>
+    <div class="toolbar">
+        <button type="submit" class="primary">Apply</button>
+        <button type="button" @onclick="ResetAsync">Reset</button>
+    </div>
+</form>
+
+<ErrorMessage Text="@_error" />
+@if (_runs is null)
+{
+    <p class="muted">Loading…</p>
+}
+else if (_runs.Count == 0)
+{
+    <p class="muted">No run matches these filters.</p>
+}
+else
+{
+    <table class="grid">
+        <thead>
+            <tr><th>Run</th><th>Status</th><th>Automation</th><th>Workflow</th><th>Host group</th><th>Trigger</th><th>Created</th><th>Finished</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var run in _runs)
+            {
+                <tr data-run="@run.Id">
+                    <td><a href="@($"runs/{run.Id}")"><code>@run.Id.ToString()[..8]</code></a></td>
+                    <td><StatusBadge Status="@run.Status" /></td>
+                    <td>@(run.AutomationName ?? "—")</td>
+                    <td><code>@run.WorkflowKey</code>@@@run.WorkflowVersion</td>
+                    <td>@run.HostGroupName</td>
+                    <td>@run.TriggerKind</td>
+                    <td><Moment Value="run.CreatedAt" /></td>
+                    <td><Moment Value="run.FinishedAt" /></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    @if (_cursor is not null)
+    {
+        <button type="button" disabled="@_loading" @onclick="MoreAsync">Load more</button>
+    }
+}
+
+@code {
+    private static readonly string[] AllStatuses = ["pending", "running", "cancelling", "succeeded", "failed", "cancelled", "timed_out"];
+
+    private readonly HashSet<string> _statuses = new(StringComparer.Ordinal);
+    private IReadOnlyList<Automation> _automations = [];
+    private IReadOnlyList<WorkflowSummary> _workflows = [];
+    private IReadOnlyList<HostGroup> _groups = [];
+    private List<RunSummary>? _runs;
+    private string? _cursor;
+    private string _automationId = "";
+    private string _workflowKey = "";
+    private string _hostGroupId = "";
+    private DateOnly? _from;
+    private DateOnly? _to;
+    private bool _loading;
+    private string? _error;
+
+    [SupplyParameterFromQuery] public Guid? AutomationId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "status")] public string? Status { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _automationId = AutomationId?.ToString() ?? "";
+        if (!string.IsNullOrEmpty(Status))
+            _statuses.Add(Status);
+        try
+        {
+            _automations = [.. (await Api.ListAutomationsAsync()).OrderBy(a => a.Name, StringComparer.OrdinalIgnoreCase)];
+            _workflows = await Api.ListWorkflowsAsync();
+            _groups = await Api.ListHostGroupsAsync();
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        await LoadAsync(append: false);
+    }
+
+    private void ToggleStatus(string status, ChangeEventArgs e)
+    {
+        if (e.Value is true)
+            _statuses.Add(status);
+        else
+            _statuses.Remove(status);
+    }
+
+    private Task ApplyAsync() => LoadAsync(append: false);
+
+    private Task ResetAsync()
+    {
+        _statuses.Clear();
+        _automationId = _workflowKey = _hostGroupId = "";
+        _from = _to = null;
+        return LoadAsync(append: false);
+    }
+
+    private Task MoreAsync() => LoadAsync(append: true);
+
+    private async Task LoadAsync(bool append)
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var page = await Api.ListRunsAsync(new RunQuery(
+                Guid.TryParse(_automationId, out var automation) ? automation : null,
+                string.IsNullOrEmpty(_workflowKey) ? null : _workflowKey,
+                [.. _statuses],
+                Guid.TryParse(_hostGroupId, out var group) ? group : null,
+                _from is { } from ? new DateTimeOffset(from.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero) : null,
+                _to is { } to ? new DateTimeOffset(to.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero) : null,
+                append ? _cursor : null));
+            _runs = append && _runs is not null ? [.. _runs, .. page.Items] : [.. page.Items];
+            _cursor = page.NextCursor;
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+            _runs ??= [];
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

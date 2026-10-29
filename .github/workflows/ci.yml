@@ -26,6 +26,7 @@ jobs:
         run: |
           dotnet test tests/Baton.Domain.Tests --no-build -c Release
           dotnet test tests/Baton.Agent.Tests --no-build -c Release
+          dotnet test tests/Baton.Web.Tests --no-build -c Release
       - name: Integration tests (Testcontainers, Docker is available on ubuntu-latest)
         # The throughput smoke (Category=Load) runs by hand; its report goes on the milestone PR.
         run: dotnet test tests/Baton.Integration.Tests --no-build -c Release --filter "Category!=Load"

@@ -1,0 +1,82 @@
+@* A workflow DAG laid out in C# and drawn as SVG (ADR-0012). With task states each node shows its state as text and colour. *@
+<div class="dag">
+    <svg width="@Num(_layout.Width)" height="@Num(_layout.Height)" viewBox="0 0 @Num(_layout.Width) @Num(_layout.Height)"
+         role="img" aria-label="@($"Task graph with {_layout.Nodes.Count} tasks")">
+        <defs>
+            <marker id="dag-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" class="dag-arrow" />
+            </marker>
+        </defs>
+        @foreach (var edge in _layout.Edges)
+        {
+            <path class="dag-edge" d="@edge.Path" marker-end="url(#dag-arrow)" data-from="@edge.From" data-to="@edge.To" />
+        }
+        @foreach (var node in _layout.Nodes)
+        {
+            var state = StateOf(node.Key);
+            <g class="@NodeClass(node.Key, state)" data-task="@node.Key" transform="translate(@Num(node.X) @Num(node.Y))"
+               tabindex="@(OnSelect.HasDelegate ? "0" : null)" role="@(OnSelect.HasDelegate ? "button" : null)"
+               @onclick="() => SelectAsync(node.Key)" @onkeydown="e => KeyAsync(e, node.Key)">
+                <title>@node.Key@(state is null ? "" : $" — {StatusBadge.Text(state)}")</title>
+                <rect width="@Num(DagLayout.NodeWidth)" height="@Num(DagLayout.NodeHeight)" rx="8" />
+                @Label("dag-key", state is null ? 32 : 22, Shorten(node.Key))
+                @if (state is not null)
+                {
+                    @Label("dag-state", 41, StatusBadge.Text(state))
+                }
+            </g>
+        }
+    </svg>
+    @if (States is not null)
+    {
+        <ul class="legend" aria-label="Legend">
+            @foreach (var state in LegendStates)
+            {
+                <li><span class="swatch state-@StatusBadge.Css(state)"></span>@StatusBadge.Text(state)</li>
+            }
+        </ul>
+    }
+</div>
+
+@code {
+    private static readonly string[] LegendStates =
+        ["waiting", "queued", "leased", "running", "retry_wait", "succeeded", "failed", "skipped", "cancelled"];
+
+    private DagLayout _layout = DagLayout.Create([]);
+    private JsonElement _graph;
+
+    [Parameter, EditorRequired] public JsonElement Graph { get; set; }
+
+    /// <summary>Task state by key; <c>null</c> for a definition without a run.</summary>
+    [Parameter] public IReadOnlyDictionary<string, string>? States { get; set; }
+
+    [Parameter] public string? Selected { get; set; }
+
+    [Parameter] public EventCallback<string> OnSelect { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (!Graph.Equals(_graph))
+        {
+            _graph = Graph;
+            _layout = DagLayout.FromGraphJson(Graph);
+        }
+    }
+
+    private string? StateOf(string key) => States is not null && States.TryGetValue(key, out var state) ? state : null;
+
+    private string NodeClass(string key, string? state) =>
+        $"dag-node{(state is null ? "" : $" state-{StatusBadge.Css(state)}")}{(key == Selected ? " selected" : "")}";
+
+    private Task SelectAsync(string key) => OnSelect.HasDelegate ? OnSelect.InvokeAsync(key) : Task.CompletedTask;
+
+    private Task KeyAsync(KeyboardEventArgs e, string key) => e.Key is "Enter" or " " ? SelectAsync(key) : Task.CompletedTask;
+
+    private static string Shorten(string key) => key.Length <= 22 ? key : key[..21] + "…";
+
+    // Razor reserves <text>, so SVG text elements are written as markup.
+    private static MarkupString Label(string css, int y, string content) =>
+        new($"<text class=\"{css}\" x=\"12\" y=\"{y}\">{System.Net.WebUtility.HtmlEncode(content)}</text>");
+
+    private static string Num(double value) => value.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+}

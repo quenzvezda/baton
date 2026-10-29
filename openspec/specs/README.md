@@ -13,5 +13,5 @@ Phase-1 capabilities (created by the changes in `../changes/`):
 | `automations` | AUT-01..07 | `add-automations-and-run-lifecycle` (M4) | Built (2026-10-28) |
 | `run-lifecycle` | ORC-01, ORC-02, ORC-11, AUT-09 | `add-automations-and-run-lifecycle` (M4) | Built (2026-10-28) |
 | `access-control` | NFR-Security (people) | `add-host-registry` (M2) | Built (2026-10-25) |
-| `run-monitoring` | OBS-01..03 | `add-web-console-and-monitoring` (M5) | Planned |
-| `web-console` | WF-09, HST-06, AUT-03 (form), OBS-01..03 (pages) | `add-web-console-and-monitoring` (M5) | Planned |
+| `run-monitoring` | OBS-01..03 | `add-web-console-and-monitoring` (M5) | Built (2026-10-29) |
+| `web-console` | WF-09, HST-06, AUT-03 (form), OBS-01..03 (pages) | `add-web-console-and-monitoring` (M5) | Built (2026-10-29) |

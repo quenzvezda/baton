@@ -1,0 +1,114 @@
+@page "/automations"
+@inject IBatonApi Api
+@inject UserSession Session
+@inject NavigationManager Navigation
+
+<PageTitle>Automations · Baton</PageTitle>
+
+<div class="page-head">
+    <h1>Automations</h1>
+    @if (_canOperate)
+    {
+        <a class="button primary" href="automations/new">New automation</a>
+    }
+</div>
+<ErrorMessage Text="@_error" />
+@if (_automations is null)
+{
+    <p class="muted">Loading…</p>
+}
+else if (_automations.Count == 0)
+{
+    <p class="muted">No automation yet.</p>
+}
+else
+{
+    <table class="grid">
+        <thead>
+            <tr><th>Name</th><th>Workflow</th><th>Triggers</th><th>State</th><th>Updated</th><th><span class="visually-hidden">Actions</span></th></tr>
+        </thead>
+        <tbody>
+            @foreach (var automation in _automations)
+            {
+                <tr data-automation="@automation.Id">
+                    <td><a href="@($"automations/{automation.Id}")">@automation.Name</a></td>
+                    <td><code>@automation.WorkflowKey</code>@(automation.WorkflowVersion is { } v ? $"@{v}" : " (latest)")</td>
+                    <td>@TriggerText(automation)</td>
+                    <td><StatusBadge Status="@(automation.Enabled ? "enabled" : "disabled")" /></td>
+                    <td><Moment Value="automation.UpdatedAt" /></td>
+                    <td class="actions">
+                        <a href="@($"runs?automationId={automation.Id}")">Runs</a>
+                        @if (_canOperate)
+                        {
+                            <button type="button" disabled="@(!automation.Enabled || _busy)" @onclick="() => RunNowAsync(automation)">Run now</button>
+                            <button type="button" disabled="@_busy" @onclick="() => ToggleAsync(automation)">@(automation.Enabled ? "Disable" : "Enable")</button>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Automation>? _automations;
+    private bool _canOperate;
+    private bool _busy;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _canOperate = await Session.HasRoleAsync(Roles.Operator);
+        try
+        {
+            _automations = [.. (await Api.ListAutomationsAsync()).OrderBy(a => a.Name, StringComparer.OrdinalIgnoreCase)];
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task RunNowAsync(Automation automation)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var run = await Api.RunNowAsync(automation.Id);
+            Navigation.NavigateTo($"runs/{run.RunId}");
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task ToggleAsync(Automation automation)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var updated = await Api.SetAutomationEnabledAsync(automation.Id, !automation.Enabled);
+            _automations![_automations.IndexOf(automation)] = updated;
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string TriggerText(Automation automation) =>
+        automation.Triggers.Count == 0
+            ? "manual only"
+            : string.Join(", ", automation.Triggers.Select(t => t.Kind == "cron" ? $"cron {t.CronExpression} ({t.TimeZone})" : t.Kind));
+}

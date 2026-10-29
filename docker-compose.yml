@@ -21,5 +21,19 @@ services:
       timeout: 3s
       retries: 10
 
+  # Development OIDC provider for the console sign-in (ADR-0017). Realm `baton`, users viewer/operator/admin,
+  # password = user name — dev only.
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0.7
+    container_name: baton-keycloak
+    command: start-dev --import-realm --http-port=8080
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin   # dev only
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./deploy/keycloak/baton-realm.json:/opt/keycloak/data/import/baton-realm.json:ro
+
 volumes:
   baton-pgdata:

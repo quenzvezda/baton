@@ -27,14 +27,14 @@ and fenced leases keep a stale worker from ever overwriting a newer result.
 ---
 
 > [!NOTE]
-> **Project status: M0–M4 done, M5 next; the v1 backend is complete.** The design, the architecture
+> **Project status: M0–M5 done, phase 1 complete; Gate G1 next.** The design, the architecture
 > decisions and the specifications for every v1 milestone are complete. The schema, test harness and
 > CI are in place, and workflows written in C# are validated, versioned, registered and listed by the
 > catalog API. Agents register, heartbeat and drain with group-scoped credentials, and people sign
 > in with OIDC roles. Ready tasks are dispatched to eligible agents under fenced leases, and lost or
 > failed attempts are retried elsewhere. Automations fire on cron, Run now and signed webhooks; runs
-> are admitted under limits, time out and can be cancelled. The web console comes next. See
-> [Roadmap](#roadmap).
+> are admitted under limits, time out and can be cancelled. A Blazor console lets people browse
+> workflows, edit automations, and follow runs, task graphs and logs live. See [Roadmap](#roadmap).
 
 ## Why Baton?
 
@@ -232,7 +232,7 @@ mapped to a milestone.
 | **M2** | [Host registry](docs/milestones/M2-host-registry.md) | Agent registration, heartbeats, drain, access control | ✅ Done |
 | **M3** | [Task dispatch & leases](docs/milestones/M3-task-dispatch.md) | Claims, fencing, reaper, retries | ✅ Done |
 | **M4** | [Automations & run lifecycle](docs/milestones/M4-automations-and-run-lifecycle.md) | Triggers, admission, limits, cancellation | ✅ Done |
-| **M5** | [Web console & monitoring](docs/milestones/M5-web-console-and-monitoring.md) | Catalog, runs, DAG view, live logs, hosts | 📝 Specified |
+| **M5** | [Web console & monitoring](docs/milestones/M5-web-console-and-monitoring.md) | Catalog, runs, DAG view, live logs, hosts | ✅ Done |
 | **G1** | [v1 production readiness](docs/milestones/G1-v1-production-readiness.md) | Load, chaos and security gate | — |
 | M6–M8 | [Phase 2 & 3](ROADMAP.md) | Aging, pinned runs, audit log, re-run from failure, OTel, extensibility | Planned |
 
@@ -252,11 +252,12 @@ Full plan, dependency graph and gates: [ROADMAP.md](ROADMAP.md).
 git clone https://github.com/quenzvezda/baton.git
 cd baton
 
-docker compose up -d                        # PostgreSQL 16 on localhost:5432 (dev credentials)
+docker compose up -d                        # PostgreSQL 16 on :5432, Keycloak on :8080 (dev credentials)
 dotnet tool restore                         # pinned dotnet-ef
 dotnet ef database update -p src/Baton.Persistence -s src/Baton.ControlPlane.Api
 dotnet build Baton.slnx
 dotnet test tests/Baton.Domain.Tests        # fast unit tests
+dotnet test tests/Baton.Web.Tests           # console components (bUnit)
 dotnet test tests/Baton.Integration.Tests   # spins up Postgres via Testcontainers
 ```
 
@@ -277,12 +278,14 @@ Behind TLS one endpoint serves both.
 ### Sign in and connect an agent locally
 
 The API accepts bearer tokens from any OIDC provider ([ADR-0014](docs/adr/0014-people-authentication-with-oidc.md)).
-Locally, `dotnet user-jwts` signs them; `appsettings.Development.json` maps its `role` claim to Baton roles.
+Locally, `docker compose up -d` also starts Keycloak with a `baton` realm ([ADR-0017](docs/adr/0017-keycloak-as-development-identity-provider.md)):
+sign in to the console as `viewer`, `operator` or `admin` (password = user name). For scripts, `dotnet user-jwts`
+signs tokens too; `appsettings.Development.json` maps the `roles` claim values `baton.viewer|operator|admin` to Baton roles.
 Agents authenticate with a token issued for their host group ([ADR-0013](docs/adr/0013-agent-authentication.md)).
 
 ```bash
 # 1. An Admin token for the API (the key lands in your user secrets, not the repo)
-dotnet user-jwts create --project src/Baton.ControlPlane.Api --role Admin --output token
+dotnet user-jwts create --project src/Baton.ControlPlane.Api --claim roles=baton.admin --output token
 
 # 2. Create a host group and issue an agent token for it ($JWT = the token above)
 curl -H "Authorization: Bearer $JWT" -H "Content-Type: application/json"      -d '{"name":"default","maxConcurrentTasks":8}' http://localhost:5100/api/host-groups
@@ -315,6 +318,23 @@ body='{"event":"orders.closed"}'
 sig=$(printf '%s' "$body" | openssl dgst -sha256 -hmac "$SECRET" | sed 's/^.* //')
 curl -H "X-Signature: sha256=$sig" -H "X-Delivery-Id: $(uuidgen)" -d "$body" http://localhost:5100/api/webhooks/<trigger-id>
 ```
+
+### Use the console
+
+`dotnet run --project src/Baton.Web` serves the console on http://localhost:5300. It signs you in through
+Keycloak ([ADR-0017](docs/adr/0017-keycloak-as-development-identity-provider.md)) and calls the API with your
+token; Operators and Admins see the actions Viewers do not.
+
+- **Workflows** — every registered workflow with its task graph, parameters and version history.
+- **Automations** — create and edit automations; the parameter form is generated from the workflow's schema
+  and the API's validation messages appear next to the field they concern.
+- **Runs** — filter by automation, workflow, status, host group and date; open a run to see its graph coloured by
+  task state, every attempt with host, times, output and error, and the attempt's log, which follows new lines
+  live while the task runs.
+- **Hosts** — status, slots, current tasks and last heartbeat; drain and undrain.
+
+The same data is available to scripts: `GET /api/runs` (filters and a `cursor` for the next page),
+`GET /api/runs/{id}`, and `GET /api/runs/{id}/tasks/{key}/logs` (send `Accept: text/event-stream` to follow it).
 
 Telemetry (traces, metrics, logs) is exported over OTLP only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set,
 e.g. `http://localhost:4317` for a local OpenTelemetry Collector.

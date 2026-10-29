@@ -16,8 +16,8 @@ OBS-01, OBS-02, OBS-03, WF-09 (page), HST-06 (page), AUT-03 (generated form), ro
 
 ## Exit criteria
 
-- [ ] ADR-0012 Accepted
-- [ ] Runs list pages through 10k runs without duplicates; first page < 500 ms
-- [ ] Live logs visible within 2 s
-- [ ] Catalog DAG, editor form, run detail DAG and hosts page usable by a Viewer/Operator walkthrough
-- [ ] Change `add-web-console-and-monitoring` archived ⇒ phase 1 complete
+- [x] ADR-0012 Accepted
+- [x] Runs list pages through 10k runs without duplicates; first page < 500 ms
+- [x] Live logs visible within 2 s
+- [x] Catalog DAG, editor form, run detail DAG and hosts page usable by a Viewer/Operator walkthrough
+- [x] Change `add-web-console-and-monitoring` archived ⇒ phase 1 complete

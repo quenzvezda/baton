@@ -29,6 +29,7 @@ public static class ControlPlane
     public static IEndpointRouteBuilder MapControlPlane(this IEndpointRouteBuilder app)
     {
         app.MapGet("/healthz", () => Results.Ok(new { status = "ok", service = "control-plane-api" })).AllowAnonymous();
+        app.MapMe();
         app.MapWorkflowCatalog();
         app.MapWorkflowLimits();
         app.MapHostGroups();

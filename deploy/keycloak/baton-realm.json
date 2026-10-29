@@ -1,0 +1,124 @@
+{
+  "realm": "baton",
+  "enabled": true,
+  "displayName": "Baton (development)",
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 28800,
+  "roles": {
+    "realm": [
+      {
+        "name": "baton.viewer"
+      },
+      {
+        "name": "baton.operator"
+      },
+      {
+        "name": "baton.admin"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "baton-web",
+      "name": "Baton console",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "implicitFlowEnabled": false,
+      "redirectUris": [
+        "http://localhost:5300/*",
+        "https://localhost:5301/*"
+      ],
+      "webOrigins": [
+        "http://localhost:5300",
+        "https://localhost:5301"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:5300/*##https://localhost:5301/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "baton-api audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "baton-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        },
+        {
+          "name": "roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "roles",
+            "multivalued": "true",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "viewer",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Viewer",
+      "lastName": "Dev",
+      "email": "viewer@baton.localhost",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "viewer",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "baton.viewer"
+      ]
+    },
+    {
+      "username": "operator",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Operator",
+      "lastName": "Dev",
+      "email": "operator@baton.localhost",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "operator",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "baton.operator"
+      ]
+    },
+    {
+      "username": "admin",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Admin",
+      "lastName": "Dev",
+      "email": "admin@baton.localhost",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "baton.admin"
+      ]
+    }
+  ]
+}

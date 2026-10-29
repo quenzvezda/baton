@@ -2,4 +2,11 @@
   <PropertyGroup>
     <Description>Blazor Server UI: automation editor, workflow catalog, runs, hosts, queue dashboard. Talks to the Control Plane API only.</Description>
   </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Baton.Web.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- OIDC authorization-code sign-in with a cookie session (ADR-0012, ADR-0014) -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" />
+  </ItemGroup>
 </Project>

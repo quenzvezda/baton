@@ -1,0 +1,169 @@
+@* One attempt's log (OBS-03): the lines written so far, then new lines as they arrive while the attempt runs. *@
+@implements IAsyncDisposable
+@inject IBatonApi Api
+
+<section class="logs" aria-label="@($"Logs of {TaskKey}, attempt {Attempt}")">
+    <header class="logs-header">
+        <strong>Logs</strong>
+        <span class="muted">attempt @Attempt</span>
+        @if (_live)
+        {
+            <label class="follow"><input type="checkbox" checked="@_follow" @onchange="ToggleFollowAsync" /> Follow live</label>
+            <span class="badge state-running">@(_following ? "live" : "paused")</span>
+        }
+    </header>
+    <ErrorMessage Text="@_error" />
+    @if (_loading)
+    {
+        <p class="muted">Loading logs…</p>
+    }
+    else if (_lines.Count == 0)
+    {
+        <p class="muted">@(_live ? "No lines yet." : "This attempt wrote no log lines.")</p>
+    }
+    else
+    {
+        <ol class="log-lines">
+            @foreach (var line in _lines)
+            {
+                <li class="log-line level-@line.Level.ToLowerInvariant()" data-seq="@line.Seq">
+                    <span class="log-time">@line.LoggedAt.UtcDateTime.ToString("HH:mm:ss.fff")</span>
+                    <span class="log-level">@line.Level</span>
+                    <span class="log-message">@line.Message</span>
+                </li>
+            }
+        </ol>
+    }
+</section>
+
+@code {
+    private readonly List<LogLine> _lines = [];
+    private CancellationTokenSource? _cts;
+    private (Guid, string, int) _target;
+    private bool _loading;
+    private bool _live;
+    private bool _follow = true;
+    private bool _following;
+    private string? _error;
+
+    [Parameter, EditorRequired] public Guid RunId { get; set; }
+
+    [Parameter, EditorRequired] public string TaskKey { get; set; } = "";
+
+    [Parameter, EditorRequired] public int Attempt { get; set; }
+
+    /// <summary>Raised when a followed attempt finishes, so the page can refresh the task's state.</summary>
+    [Parameter] public EventCallback OnFinished { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_target == (RunId, TaskKey, Attempt))
+            return;
+        _target = (RunId, TaskKey, Attempt);
+        await StopAsync();
+        _cts = new CancellationTokenSource();
+        _lines.Clear();
+        _error = null;
+        _loading = true;
+        try
+        {
+            await LoadAsync(_cts.Token);
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+
+        if (_live && _follow)
+            StartFollowing();
+    }
+
+    private async Task LoadAsync(CancellationToken ct)
+    {
+        var afterSeq = 0;
+        while (true)
+        {
+            var page = await Api.GetLogsAsync(RunId, TaskKey, Attempt, afterSeq, ct);
+            if (page is null)
+            {
+                _live = false;
+                return;
+            }
+            _lines.AddRange(page.Lines);
+            _live = page.IsLive;
+            if (page.NextAfterSeq is not { } next)
+                return;
+            afterSeq = next;
+        }
+    }
+
+    private void StartFollowing()
+    {
+        var ct = _cts!.Token;
+        _following = true;
+        _ = FollowAsync(_lines.Count == 0 ? 0 : _lines[^1].Seq, ct);
+    }
+
+    private async Task FollowAsync(int afterSeq, CancellationToken ct)
+    {
+        try
+        {
+            await foreach (var line in Api.FollowLogsAsync(RunId, TaskKey, Attempt, afterSeq, ct))
+            {
+                if (line.Seq <= afterSeq)
+                    continue;
+                afterSeq = line.Seq;
+                _lines.Add(line);
+                await InvokeAsync(StateHasChanged);
+            }
+
+            if (ct.IsCancellationRequested)
+                return;
+            _live = false;
+            _following = false;
+            await InvokeAsync(StateHasChanged);
+            await InvokeAsync(() => OnFinished.InvokeAsync());
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex) when (ex is ApiException or HttpRequestException or IOException)
+        {
+            _following = false;
+            _error = $"The live log stopped: {ex.Message}";
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task ToggleFollowAsync(ChangeEventArgs e)
+    {
+        _follow = e.Value is true;
+        if (_follow && !_following && _live)
+        {
+            await StopAsync();
+            _cts = new CancellationTokenSource();
+            StartFollowing();
+        }
+        else if (!_follow)
+        {
+            await StopAsync();
+            _cts = new CancellationTokenSource();
+        }
+    }
+
+    private async Task StopAsync()
+    {
+        _following = false;
+        if (_cts is null)
+            return;
+        await _cts.CancelAsync();
+        _cts.Dispose();
+        _cts = null;
+    }
+
+    public async ValueTask DisposeAsync() => await StopAsync();
+}

@@ -4,11 +4,16 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
-    <link rel="stylesheet" href="app.css" />
-    <HeadOutlet @rendermode="InteractiveServer" />
+    <link rel="stylesheet" href="@Assets["app.css"]" />
+    <HeadOutlet @rendermode="Mode" />
 </head>
 <body>
-    <Routes @rendermode="InteractiveServer" />
+    <Routes @rendermode="Mode" />
     <script src="_framework/blazor.web.js"></script>
 </body>
 </html>
+
+@code {
+    // No prerendering: pages load once, in the circuit that holds the person's API token (ADR-0012).
+    private static readonly IComponentRenderMode Mode = new InteractiveServerRenderMode(prerender: false);
+}
