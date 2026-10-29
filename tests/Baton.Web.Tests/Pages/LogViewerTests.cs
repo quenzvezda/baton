@@ -27,8 +27,8 @@ public sealed class LogViewerTests
     {
         using var ctx = new ConsoleContext();
         ctx.Api.Logs[(RunId, "build-report", 1)] = new LogPage(1, true, [Line(1, "Information", "before")], null);
-        var finished = false;
-        var cut = Render(ctx, () => finished = true);
+        var finished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var cut = Render(ctx, () => finished.TrySetResult());
         Assert.Equal("live", cut.Find(".logs-header .badge").TextContent);
 
         await ctx.Api.LiveLines.Writer.WriteAsync(Line(2, "Warning", "live line"));
@@ -36,7 +36,8 @@ public sealed class LogViewerTests
         cut.WaitForAssertion(() => Assert.Equal(["before", "live line"], cut.FindAll(".log-message").Select(m => m.TextContent)));
 
         ctx.Api.LiveLines.Writer.Complete();
-        cut.WaitForAssertion(() => Assert.True(finished));
+        // The callback fires after the component's last render, so await it rather than re-check on renders.
+        await finished.Task.WaitAsync(TimeSpan.FromSeconds(10));
         cut.WaitForAssertion(() => Assert.Empty(cut.FindAll(".follow")));
     }
 
