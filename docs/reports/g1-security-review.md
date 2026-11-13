@@ -5,16 +5,17 @@ reviewed; no secrets in parameters or logs" · **Method:** code read of `main` a
 ADR-0013, 0014, 0015, 0017 and `openspec/specs/` (access-control, automations, host-registry); greps over
 tracked files. No dynamic testing.
 
-**Result:** no Critical or High findings. Three Medium findings block the criterion until fixed or
-accepted by the owner; Low and Info items are recorded for later.
+**Result:** no Critical or High findings. M1 and M3 are fixed (2026-11-14, branch
+`g1/v1-production-readiness`); M2 changes the webhook contract and waits for an owner decision. Low and
+Info items are recorded for later.
 
 ## Findings
 
 | ID | Severity | Area | Status |
 | --- | --- | --- | --- |
-| M1 | Medium | Agent credentials | Open |
+| M1 | Medium | Agent credentials | Fixed |
 | M2 | Medium | Webhook HMAC | Open — needs a spec delta (contract change) |
-| M3 | Medium | Webhook secrets at rest | Open |
+| M3 | Medium | Webhook secrets at rest | Fixed (opt-in per deployment) |
 | L1 | Low | Secrets in parameters | Open |
 | L2 | Low | Console sign-in | Open (unverified) |
 | L3 | Low | gRPC limits | Open |
@@ -30,9 +31,12 @@ rebinds `credential_id` to the caller. After an Admin moves host `gpu-01` from `
 `etl` token can re-register `gpu-01`, rebind it, and claim and complete `gpu` tasks (parameters, upstream
 outputs, forged results). This widens ADR-0013's "a token is worth one group".
 
-Fix: second branch `h.credential_id = @credentialId`; in `RegisterSql` overwrite `credential_id` only when
-`h.host_group_id = @credentialGroupId`. Tests: a second token of the old group is refused; a revoked bound
-credential is refused.
+**Fixed.** `MayActFor` now matches the bound credential by id (`h.credential_id = @credentialId`); the
+claim, lease, heartbeat and register queries take the caller's whole credential. Rebinding in `RegisterSql`
+needs no change: it can only rebind to a token of the host's current group or to the same token. Tests
+`Another_token_of_the_former_group_cannot_take_over_a_moved_host` and
+`Revoking_the_bound_token_of_a_moved_host_locks_out_its_former_group` fail on the old check. Residual: when
+several hosts share one group token (allowed by ADR-0013), they share its identity, moved or not.
 
 ### M2 — webhook signatures replay indefinitely
 
@@ -50,9 +54,12 @@ ADR-0015's successor.
 although ADR-0015 says production encrypts the key ring "through configuration". A `pg_dump` (the G1
 backup test produces one) holds both `data_protection_keys` and the protected webhook secrets.
 
-Fix: optional `Baton:DataProtection` section (certificate) that calls `ProtectKeysWithCertificate`; warn
-at startup outside Development when unset. Until then: treat database backups as secret material
-(runbook "Backup and restore").
+**Fixed.** `Baton:DataProtection:CertificatePath` (PKCS#12 with private key) and
+`Baton:DataProtection:CertificatePassword` (environment variable) encrypt the key ring with
+`ProtectKeysWithCertificate` and read it back with the same file (`KeyRingProtection.cs`; tests
+`KeyRingProtectionTests`). Unset, the ring stays unencrypted and Data Protection logs its startup warning —
+so a deployment without a certificate must treat database backups as secret material (runbook "Backup and
+restore"). Keys written before the certificate was configured stay unencrypted until they expire (90 days).
 
 ### Low
 

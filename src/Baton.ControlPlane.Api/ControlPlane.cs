@@ -19,9 +19,10 @@ public static class ControlPlane
         services.AddProblemDetails();
         services.AddBatonSecurity(configuration);
 
-        // Webhook secrets (ADR-0015): one key ring in Postgres for every replica. Encrypting the key ring at
-        // rest (certificate, Key Vault) is configured per deployment.
-        services.AddDataProtection().SetApplicationName("baton").PersistKeysToDbContext<BatonDbContext>();
+        // Webhook secrets (ADR-0015): one key ring in Postgres for every replica, encrypted at rest with the
+        // certificate named by Baton:DataProtection:CertificatePath when the deployment provides one.
+        services.AddDataProtection().SetApplicationName("baton").PersistKeysToDbContext<BatonDbContext>()
+            .ProtectKeysFromConfiguration(configuration);
         services.AddSingleton<WebhookSecrets>();
         return services;
     }
