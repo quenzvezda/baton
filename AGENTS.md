@@ -56,6 +56,7 @@ dotnet test tests/Baton.Agent.Tests                   # unit (agent)
 dotnet test tests/Baton.Web.Tests                     # unit (console components, bUnit)
 dotnet test tests/Baton.Integration.Tests             # needs Docker
 dotnet test tests/Baton.Integration.Tests --filter Category=Load   # throughput smoke, by hand
+dotnet test tests/Baton.Integration.Tests --filter Category=G1     # gate G1 load (15 min), chaos, backup; by hand
 dotnet run --project src/Baton.ControlPlane.Api       # http://localhost:5100
 dotnet run --project src/Baton.Orchestrator           # http://localhost:5200 (gRPC + /healthz)
 dotnet run --project src/Baton.Agent

@@ -21,17 +21,17 @@ gate runs on a single machine with `docker compose` and needs no production infr
 - [x] OQ-01 answered; NFR targets in design spec §3 confirmed or revised
 
 **Performance** (load-test report attached)
-- [ ] 10k task runs/day profile with 20 dispatches/s peaks sustained for 15 min
-- [ ] p95 Queued→Leased < 2 s with free slots; cron runs created within 5 s
+- [x] 10k task runs/day profile with 20 dispatches/s peaks sustained for 15 min ([report](../reports/g1-load-test.md): 20.0/s)
+- [x] p95 Queued→Leased < 2 s with free slots; cron runs created within 5 s (p95 14 ms; cron ≤ 61 ms)
 
 **Resilience** (chaos report attached)
-- [ ] Kill an agent, kill one of two orchestrator replicas, and restart Postgres under load: no accepted run lost, no task running twice concurrently
-- [ ] Rolling agent upgrade under load fails no runs (drain + definition-hash matching)
+- [x] Kill an agent, kill one of two orchestrator replicas, and restart Postgres under load: no accepted run lost, no task running twice concurrently ([report](../reports/g1-chaos-test.md))
+- [x] Rolling agent upgrade under load fails no runs (drain + definition-hash matching) ([report](../reports/g1-chaos-test.md); hash matching by the M3 claim tests)
 
 **Security**
 - [x] OIDC roles, agent credentials and webhook HMAC reviewed; no secrets in parameters or logs ([report](../reports/g1-security-review.md): Medium findings fixed, Low items recorded)
 
 **Operations**
 - [x] Partition creation and 90-day retention running; limit reconciler alerting on corrections (`add-history-retention`)
-- [ ] Runbooks: stuck queue, lease-expiry spike, Postgres outage and restart, agent rollout
-- [ ] Backup (`pg_dump`) restored into an empty database and verified
+- [x] Runbooks: stuck queue, lease-expiry spike, Postgres outage and restart, agent rollout ([`docs/runbooks/`](../runbooks/README.md))
+- [x] Backup (`pg_dump`) restored into an empty database and verified (`G1BackupTests`, [runbook](../runbooks/backup-restore.md))
