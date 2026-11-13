@@ -31,7 +31,7 @@ public sealed class SingletonLoopTests(PostgresFixture pg)
     [Fact]
     public async Task Partition_maintenance_tick_runs_against_the_migrated_schema()
     {
-        var loop = new PartitionMaintenanceLoop(pg.DataSource, NullLogger<PartitionMaintenanceLoop>.Instance);
+        var loop = new PartitionMaintenanceLoop(pg.DataSource, TestMetrics.Create(), NullLogger<PartitionMaintenanceLoop>.Instance);
 
         Assert.True(await loop.RunOnceAsync(CancellationToken.None));
     }

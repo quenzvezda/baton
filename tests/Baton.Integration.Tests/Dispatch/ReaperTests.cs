@@ -156,7 +156,7 @@ public sealed class ReaperTests(PostgresFixture pg)
         await s.ClaimAsync(host);
         await HostData.ExecuteAsync(pg, "UPDATE concurrency_limits SET in_use = 5 WHERE key = @key", ("key", DbNames.GroupTasksLimit(s.GroupId)));
 
-        var loop = new LimitReconcilerLoop(pg.DataSource, Options.Create(new DispatchOptions()),
+        var loop = new LimitReconcilerLoop(pg.DataSource, Options.Create(new DispatchOptions()), TestMetrics.Create(),
             NullLogger<LimitReconcilerLoop>.Instance);
         Assert.True(await loop.RunOnceAsync(CancellationToken.None));
 
