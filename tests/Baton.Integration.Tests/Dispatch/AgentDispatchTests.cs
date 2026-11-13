@@ -87,7 +87,7 @@ public sealed class AgentDispatchTests(PostgresFixture pg) : IAsyncLifetime
 
             var lease = Assert.Single(reply.Leases);
             Assert.Equal(runId.ToString(), lease.WorkflowRunId);
-            await s.Leases.CompleteAsync(s.GroupId,
+            await s.Leases.CompleteAsync(s.Credential,
                 DispatchScenario.Report(Guid.Parse(lease.TaskRunId), lease.LeaseToken, Domain.Runs.AttemptOutcome.Succeeded),
                 CancellationToken.None);
         }

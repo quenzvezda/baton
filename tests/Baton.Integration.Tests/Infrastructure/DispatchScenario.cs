@@ -44,6 +44,10 @@ internal sealed class DispatchScenario
 
     public PostgresFixture Pg { get; }
     public Guid GroupId { get; }
+
+    /// <summary>A credential of the scenario's group that is bound to no host: it acts for hosts through their group only.</summary>
+    public AgentCredential Credential => new(Guid.Empty, GroupId);
+
     public string GroupName { get; }
     public long DefinitionId { get; }
     public string Hash { get; }
@@ -88,7 +92,7 @@ internal sealed class DispatchScenario
             CancellationToken.None);
 
     public async Task<ClaimResult> ClaimAsync(Guid hostId, int freeSlots = 4) =>
-        await Claims.ClaimAsync(GroupId, hostId, freeSlots, CancellationToken.None)
+        await Claims.ClaimAsync(Credential, hostId, freeSlots, CancellationToken.None)
         ?? throw new InvalidOperationException("Host is unknown to the scenario's group.");
 
     /// <summary>Claims exactly one task and fails the test otherwise.</summary>
@@ -96,7 +100,7 @@ internal sealed class DispatchScenario
 
     public Task<bool> CompleteAsync(ClaimedTask task, AttemptOutcome outcome = AttemptOutcome.Succeeded, string? output = "1",
         bool retryable = true) =>
-        Leases.CompleteAsync(GroupId, Report(task.TaskRunId, task.LeaseToken, outcome, output, retryable), CancellationToken.None);
+        Leases.CompleteAsync(Credential, Report(task.TaskRunId, task.LeaseToken, outcome, output, retryable), CancellationToken.None);
 
     public static AttemptReport Report(Guid taskRunId, long token, AttemptOutcome outcome, string? output = "1", bool retryable = true) =>
         new(taskRunId, token, outcome, outcome == AttemptOutcome.Succeeded ? output : null, output?.Length ?? 0,

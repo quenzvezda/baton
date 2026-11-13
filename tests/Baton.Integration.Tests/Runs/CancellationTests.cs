@@ -16,7 +16,7 @@ public sealed class CancellationTests(PostgresFixture pg)
         var host = await s.Dispatch.AddHostAsync();
         var runId = await s.StartRunAsync();
         var lease = await s.Dispatch.ClaimOneAsync(host);
-        await s.Dispatch.Leases.StartAsync(s.GroupId, lease.TaskRunId, lease.LeaseToken, CancellationToken.None);
+        await s.Dispatch.Leases.StartAsync(s.Dispatch.Credential, lease.TaskRunId, lease.LeaseToken, CancellationToken.None);
 
         var outcome = await s.Cancellation.CancelAsync(runId, RunCancelReason.User, CancellationToken.None);
         var heartbeat = await s.Dispatch.Leases.RenewAsync(host, [new HeldLease(lease.TaskRunId, lease.LeaseToken)], CancellationToken.None);

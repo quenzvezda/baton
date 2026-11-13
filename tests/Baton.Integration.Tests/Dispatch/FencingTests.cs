@@ -82,8 +82,8 @@ public sealed class FencingTests(PostgresFixture pg)
         var runId = await s.StartRunAsync();
         var lease = await s.ClaimOneAsync(host);
 
-        Assert.True(await s.Leases.StartAsync(s.GroupId, lease.TaskRunId, lease.LeaseToken, CancellationToken.None));
-        Assert.True(await s.Leases.StartAsync(s.GroupId, lease.TaskRunId, lease.LeaseToken, CancellationToken.None));
+        Assert.True(await s.Leases.StartAsync(s.Credential, lease.TaskRunId, lease.LeaseToken, CancellationToken.None));
+        Assert.True(await s.Leases.StartAsync(s.Credential, lease.TaskRunId, lease.LeaseToken, CancellationToken.None));
 
         Assert.Equal("running", (await s.TaskAsync(runId, "a")).Status);
         Assert.Single(await s.EventTypesAsync(runId, "a"), "task.started");
@@ -99,10 +99,10 @@ public sealed class FencingTests(PostgresFixture pg)
         var stale = lease.LeaseToken - 1;
         var eventsBefore = await s.EventTypesAsync(runId);
 
-        var started = await s.Leases.StartAsync(s.GroupId, lease.TaskRunId, stale, CancellationToken.None);
-        var completed = await s.Leases.CompleteAsync(s.GroupId,
+        var started = await s.Leases.StartAsync(s.Credential, lease.TaskRunId, stale, CancellationToken.None);
+        var completed = await s.Leases.CompleteAsync(s.Credential,
             DispatchScenario.Report(lease.TaskRunId, stale, AttemptOutcome.Succeeded), CancellationToken.None);
-        var logged = await s.Leases.AppendLogsAsync(s.GroupId, lease.TaskRunId, 1, stale,
+        var logged = await s.Leases.AppendLogsAsync(s.Credential, lease.TaskRunId, 1, stale,
             [new TaskLogLine(1, DateTime.UtcNow, 2, "late")], CancellationToken.None);
 
         Assert.False(started);
@@ -126,7 +126,7 @@ public sealed class FencingTests(PostgresFixture pg)
         var runId = await s.StartRunAsync();
         var lease = await s.ClaimOneAsync(host);
 
-        var completed = await s.Leases.CompleteAsync(other.GroupId,
+        var completed = await s.Leases.CompleteAsync(other.Credential,
             DispatchScenario.Report(lease.TaskRunId, lease.LeaseToken, AttemptOutcome.Succeeded), CancellationToken.None);
 
         Assert.False(completed);
@@ -167,8 +167,8 @@ public sealed class FencingTests(PostgresFixture pg)
         var at = DateTime.UtcNow;
         TaskLogLine[] chunk = [new(1, at, 2, "one"), new(2, at, 3, "two"), new(3, at.AddYears(-3), 4, "clock skew")];
 
-        var first = await s.Leases.AppendLogsAsync(s.GroupId, lease.TaskRunId, 1, lease.LeaseToken, chunk, CancellationToken.None);
-        var retried = await s.Leases.AppendLogsAsync(s.GroupId, lease.TaskRunId, 1, lease.LeaseToken, chunk[..2], CancellationToken.None);
+        var first = await s.Leases.AppendLogsAsync(s.Credential, lease.TaskRunId, 1, lease.LeaseToken, chunk, CancellationToken.None);
+        var retried = await s.Leases.AppendLogsAsync(s.Credential, lease.TaskRunId, 1, lease.LeaseToken, chunk[..2], CancellationToken.None);
 
         Assert.Equal(3, first);
         Assert.Equal(0, retried);

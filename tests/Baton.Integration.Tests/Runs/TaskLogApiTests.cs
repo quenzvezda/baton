@@ -131,12 +131,12 @@ public sealed class TaskLogApiTests(PostgresFixture pg) : IAsyncLifetime
         var host = await s.Dispatch.AddHostAsync();
         var runId = await s.StartRunAsync();
         var lease = await s.Dispatch.ClaimOneAsync(host);
-        Assert.True(await s.Dispatch.Leases.StartAsync(s.GroupId, lease.TaskRunId, lease.LeaseToken, CancellationToken.None));
+        Assert.True(await s.Dispatch.Leases.StartAsync(s.Dispatch.Credential, lease.TaskRunId, lease.LeaseToken, CancellationToken.None));
         return (s, runId, lease);
     }
 
     private static async Task AppendAsync(RunScenario s, ClaimedTask lease, params (int Seq, LogLevel Level, string Message)[] lines) =>
-        Assert.Equal(lines.Length, await s.Dispatch.Leases.AppendLogsAsync(s.GroupId, lease.TaskRunId, lease.Attempt, lease.LeaseToken,
+        Assert.Equal(lines.Length, await s.Dispatch.Leases.AppendLogsAsync(s.Dispatch.Credential, lease.TaskRunId, lease.Attempt, lease.LeaseToken,
             [.. lines.Select(l => new TaskLogLine(l.Seq, DateTime.UtcNow, (int)l.Level, l.Message))], CancellationToken.None));
 
     private static async Task<SseItem<string>> NextAsync(IAsyncEnumerator<SseItem<string>> events, CancellationToken ct)

@@ -120,7 +120,7 @@ internal sealed partial class AgentGrpcService(
         Task? wake = null;
         while (true)
         {
-            var result = await claims.ClaimAsync(credential.HostGroupId, hostId, request.FreeSlots, ct)
+            var result = await claims.ClaimAsync(credential, hostId, request.FreeSlots, ct)
                 ?? throw new RpcException(new Status(StatusCode.NotFound, "Host is not registered for this credential; register again."));
 
             if (result.Tasks.Count > 0)
@@ -146,7 +146,7 @@ internal sealed partial class AgentGrpcService(
     {
         var taskRunId = ParseId(request.TaskRunId, "task_run_id");
         var credential = AgentAuthInterceptor.Credential(context);
-        if (!await leases.StartAsync(credential.HostGroupId, taskRunId, request.LeaseToken, context.CancellationToken))
+        if (!await leases.StartAsync(credential, taskRunId, request.LeaseToken, context.CancellationToken))
             throw Stale(taskRunId, request.LeaseToken, "Start");
         return new StartReply();
     }
@@ -178,7 +178,7 @@ internal sealed partial class AgentGrpcService(
             Retryable: request.Error?.Retryable ?? true);
 
         var credential = AgentAuthInterceptor.Credential(context);
-        if (!await leases.CompleteAsync(credential.HostGroupId, report, context.CancellationToken))
+        if (!await leases.CompleteAsync(credential, report, context.CancellationToken))
             throw Stale(taskRunId, request.LeaseToken, "Complete");
         return new CompleteReply();
     }
@@ -195,7 +195,7 @@ internal sealed partial class AgentGrpcService(
 
             var lines = chunk.Lines.Select(l => new TaskLogLine(
                 l.Seq, l.LoggedAt?.ToDateTime() ?? DateTime.UtcNow, l.Level, l.Message)).ToList();
-            accepted += await leases.AppendLogsAsync(credential.HostGroupId, taskRunId, chunk.Attempt, chunk.LeaseToken, lines,
+            accepted += await leases.AppendLogsAsync(credential, taskRunId, chunk.Attempt, chunk.LeaseToken, lines,
                 context.CancellationToken) ?? throw Stale(taskRunId, chunk.LeaseToken, "AppendLogs");
         }
 

@@ -70,7 +70,7 @@ public sealed class ReaperTests(PostgresFixture pg)
         var host = await s.AddHostAsync();
         var runId = await s.StartRunAsync();
         var lease = await s.ClaimOneAsync(host);
-        await s.Leases.StartAsync(s.GroupId, lease.TaskRunId, lease.LeaseToken, CancellationToken.None);
+        await s.Leases.StartAsync(s.Credential, lease.TaskRunId, lease.LeaseToken, CancellationToken.None);
         // The host keeps heartbeating (lease valid), but the handler has run 2 min + 1 s past a 1 min timeout.
         await HostData.ExecuteAsync(pg, "UPDATE task_runs SET started_at = now() - interval '121 seconds' WHERE id = @id", ("id", lease.TaskRunId));
 

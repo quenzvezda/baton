@@ -170,6 +170,49 @@ public sealed class AgentRegistrationTests(PostgresFixture pg) : IAsyncLifetime
         Assert.Equal("1.1.0", host.AgentVersion);
     }
 
+    /// <summary>G1 security review M1: only the very credential a moved host registered with keeps acting for it.</summary>
+    [Fact]
+    public async Task Another_token_of_the_former_group_cannot_take_over_a_moved_host()
+    {
+        var (etlId, etl) = await HostData.CreateGroupAsync(pg, "etl");
+        var (gpuId, _) = await HostData.CreateGroupAsync(pg, "gpu");
+        var (_, boundToken) = await HostData.IssueCredentialAsync(pg, etlId);
+        var (_, otherToken) = await HostData.IssueCredentialAsync(pg, etlId);
+        var name = HostData.NewName("etl-01");
+        var registered = await _orchestrator.RegisterAsync(boundToken, name, etl, version: "1.0.0");
+        var hostId = Guid.Parse(registered.HostId);
+        await _hosts.MoveAsync(hostId, gpuId, CancellationToken.None);
+
+        var takeover = await Assert.ThrowsAsync<RpcException>(() => _orchestrator.RegisterAsync(otherToken, name, etl, version: "6.6.6"));
+        var heartbeat = await Assert.ThrowsAsync<RpcException>(() => _orchestrator.HeartbeatAsync(otherToken, registered.HostId));
+
+        Assert.Equal(StatusCode.PermissionDenied, takeover.StatusCode);
+        Assert.Equal(StatusCode.NotFound, heartbeat.StatusCode);
+        var host = await _hosts.FindAsync(hostId, CancellationToken.None);
+        Assert.Equal(gpuId, host!.HostGroupId);
+        Assert.Equal("1.0.0", host.AgentVersion);
+        await _orchestrator.HeartbeatAsync(boundToken, registered.HostId); // the bound token still works
+    }
+
+    [Fact]
+    public async Task Revoking_the_bound_token_of_a_moved_host_locks_out_its_former_group()
+    {
+        var (etlId, etl) = await HostData.CreateGroupAsync(pg, "etl");
+        var (gpuId, _) = await HostData.CreateGroupAsync(pg, "gpu");
+        var (boundId, boundToken) = await HostData.IssueCredentialAsync(pg, etlId);
+        var (_, otherToken) = await HostData.IssueCredentialAsync(pg, etlId);
+        var name = HostData.NewName("etl-01");
+        var registered = await _orchestrator.RegisterAsync(boundToken, name, etl);
+        await _hosts.MoveAsync(Guid.Parse(registered.HostId), gpuId, CancellationToken.None);
+        await HostData.ExecuteAsync(pg, "UPDATE agent_credentials SET revoked_at = now() WHERE id = @id", ("id", boundId));
+
+        var takeover = await Assert.ThrowsAsync<RpcException>(() => _orchestrator.RegisterAsync(otherToken, name, etl));
+        var heartbeat = await Assert.ThrowsAsync<RpcException>(() => _orchestrator.HeartbeatAsync(otherToken, registered.HostId));
+
+        Assert.Equal(StatusCode.PermissionDenied, takeover.StatusCode);
+        Assert.Equal(StatusCode.NotFound, heartbeat.StatusCode);
+    }
+
     [Theory]
     [InlineData("", 1, "1.0.0")]
     [InlineData("host", 0, "1.0.0")]
