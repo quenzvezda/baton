@@ -20,6 +20,7 @@ public static class AgentProtocol
         services.AddHostedService<TasksReadyListener>();
         services.AddGrpc(grpc =>
         {
+            grpc.Interceptors.Add<DatabaseUnavailableInterceptor>(); // outermost: also covers the auth lookup
             grpc.Interceptors.Add<AgentAuthInterceptor>();
             grpc.MaxReceiveMessageSize = ProtocolLimits.MaxMessageBytes;
             grpc.MaxSendMessageSize = ProtocolLimits.MaxMessageBytes;
