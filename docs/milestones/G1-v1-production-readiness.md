@@ -29,7 +29,7 @@ gate runs on a single machine with `docker compose` and needs no production infr
 - [ ] Rolling agent upgrade under load fails no runs (drain + definition-hash matching)
 
 **Security**
-- [ ] OIDC roles, agent credentials and webhook HMAC reviewed; no secrets in parameters or logs
+- [x] OIDC roles, agent credentials and webhook HMAC reviewed; no secrets in parameters or logs ([report](../reports/g1-security-review.md): Medium findings fixed, Low items recorded)
 
 **Operations**
 - [x] Partition creation and 90-day retention running; limit reconciler alerting on corrections (`add-history-retention`)

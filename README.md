@@ -313,10 +313,11 @@ curl -H "Authorization: Bearer $JWT" -H "Content-Type: application/json" http://
 curl -X POST -H "Authorization: Bearer $JWT" http://localhost:5100/api/automations/<automation-id>/runs   # Run now
 curl -X POST -H "Authorization: Bearer $JWT" http://localhost:5100/api/runs/<run-id>/cancel
 
-# A webhook delivery: HMAC-SHA256 of the raw body with the trigger's secret, and a delivery id for retries
-body='{"event":"orders.closed"}'
-sig=$(printf '%s' "$body" | openssl dgst -sha256 -hmac "$SECRET" | sed 's/^.* //')
-curl -H "X-Signature: sha256=$sig" -H "X-Delivery-Id: $(uuidgen)" -d "$body" http://localhost:5100/api/webhooks/<trigger-id>
+# A webhook delivery: HMAC-SHA256 with the trigger's secret over "<unix time>.<delivery id>.<raw body>".
+# The timestamp must be within 5 minutes of the server's time; reuse the delivery id (and signature) on retries.
+body='{"event":"orders.closed"}'; ts=$(date +%s); id=$(uuidgen)
+sig=$(printf '%s.%s.%s' "$ts" "$id" "$body" | openssl dgst -sha256 -hmac "$SECRET" | sed 's/^.* //')
+curl -H "X-Signature: t=$ts,v1=$sig" -H "X-Delivery-Id: $id" -d "$body" http://localhost:5100/api/webhooks/<trigger-id>
 ```
 
 ### Use the console

@@ -5,16 +5,16 @@ reviewed; no secrets in parameters or logs" · **Method:** code read of `main` a
 ADR-0013, 0014, 0015, 0017 and `openspec/specs/` (access-control, automations, host-registry); greps over
 tracked files. No dynamic testing.
 
-**Result:** no Critical or High findings. M1 and M3 are fixed (2026-11-14, branch
-`g1/v1-production-readiness`); M2 changes the webhook contract and waits for an owner decision. Low and
-Info items are recorded for later.
+**Result:** no Critical or High findings. All three Medium findings are fixed (2026-11-14, branch
+`g1/v1-production-readiness`); M2 through OpenSpec change `harden-webhook-signatures`, which changes the
+webhook contract. Low and Info items are recorded for later.
 
 ## Findings
 
 | ID | Severity | Area | Status |
 | --- | --- | --- | --- |
 | M1 | Medium | Agent credentials | Fixed |
-| M2 | Medium | Webhook HMAC | Open — needs a spec delta (contract change) |
+| M2 | Medium | Webhook HMAC | Fixed (breaking webhook contract) |
 | M3 | Medium | Webhook secrets at rest | Fixed (opt-in per deployment) |
 | L1 | Low | Secrets in parameters | Open |
 | L2 | Low | Console sign-in | Open (unverified) |
@@ -44,9 +44,12 @@ The HMAC covers only the raw body (`src/Baton.Domain/Automations/WebhookSignatur
 deduplicates but is not signed, and there is no timestamp. One captured request replays forever with a
 fresh delivery id, each creating a run (unbounded under the `allow` policy) until the secret is rotated.
 
-Fix: sign `"{timestamp}.{deliveryId}.{body}"`, header `X-Signature: t=<unix>,v1=<hex>`, reject outside
-±5 min of Postgres time. Changes the webhook contract ⇒ OpenSpec change (automations delta) and a note in
-ADR-0015's successor.
+**Fixed** (`harden-webhook-signatures`). `X-Signature: t=<unix>,v1=<hex>` signs `<t>.<delivery id>.<body>`;
+timestamps more than 5 minutes from Postgres `now()` are refused. A captured request cannot change its
+delivery id, so inside the window a replay is a duplicate delivery (first run returned) and outside it is
+401. The old `sha256=` form is rejected. ADR-0015 (secret storage) is unchanged. Tests:
+`WebhookSignatureTests`, `Stale_timestamp_is_401_and_creates_no_run`, `Replay_with_another_delivery_id_is_401`,
+`Old_body_only_signature_is_401`.
 
 ### M3 — Data Protection key ring stored unencrypted next to the secrets it protects
 
