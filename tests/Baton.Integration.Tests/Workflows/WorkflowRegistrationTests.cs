@@ -109,7 +109,7 @@ public sealed class WorkflowRegistrationTests(PostgresFixture pg)
 
         await _registrar.RegisterAsync(set.Workflows, CancellationToken.None);
 
-        Assert.Equal(["chaos-pipeline@1", "housekeeping@1", "nightly-sales-report@2"], set.Workflows.Select(w => w.Id));
+        Assert.Equal(["chaos-pipeline@1", "g1-pipeline@1", "housekeeping@1", "nightly-sales-report@2"], set.Workflows.Select(w => w.Id));
         Assert.Contains(await RowsAsync("housekeeping"), r => r.Version == 1);
         var report = Assert.Single(await RowsAsync("nightly-sales-report"));
         Assert.Equal(set.Workflows.Single(w => w.Key == "nightly-sales-report").Hash, report.Hash);
