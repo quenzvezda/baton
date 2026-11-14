@@ -63,6 +63,9 @@ message TaskLease {
   google.protobuf.Duration timeout = 7;
   bytes  params_json = 8;
   map<string, bytes> upstream_outputs_json = 9;
+  // W3C traceparent of the run's trace (OBS-06, M7 design.md decision 27); empty when the run has none.
+  // Added in M7: agents older than M7 ignore it.
+  string trace_parent = 10;
 }
 
 message LeaseRef {

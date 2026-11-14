@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using System.Reflection;
+using Baton.Agent.Worker;
 using System.Text.Json;
 using Baton.Abstractions;
 using Baton.Agent.Protocol.V1;
@@ -47,10 +49,52 @@ public sealed class TaskExecutor(IServiceProvider services, WorkflowSet workflow
         .GroupBy(w => w.Hash, StringComparer.Ordinal)
         .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
 
+    /// <summary>The agent's activity source (OBS-06): one <see cref="ExecuteActivity"/> span per handler attempt.</summary>
+    public const string SourceName = "Baton.Agent";
+
+    public static readonly ActivitySource Source = new(SourceName);
+
+    public const string ExecuteActivity = "baton.task.execute";
+
+    /// <summary>
+    /// Runs the attempt inside a span of the run's trace (the lease's <c>trace_parent</c>; a root span when the run has
+    /// none) and a logging scope with the run id, task key and attempt, so the handler's log records carry both
+    /// (OBS-06, M7 design.md decisions 28–29). The span ends with the attempt's outcome; a failure or timeout marks it
+    /// as an error with the exception.
+    /// </summary>
     /// <param name="logger">Becomes <c>TaskContext.Logger</c>.</param>
     public async Task<TaskResult> ExecuteAsync(RunningTask task, ILogger logger, CancellationToken hostStopping)
     {
         ArgumentNullException.ThrowIfNull(task);
+        ArgumentNullException.ThrowIfNull(logger);
+        var lease = task.Lease;
+
+        ActivityContext.TryParse(lease.TraceParent, null, isRemote: true, out var parent);
+        using var activity = Source.StartActivity(ExecuteActivity, ActivityKind.Internal, parent);
+        activity?.SetTag("baton.run.id", lease.WorkflowRunId);
+        activity?.SetTag("baton.task.key", lease.TaskKey);
+        activity?.SetTag("baton.attempt", lease.Attempt);
+        activity?.SetTag("baton.task_run.id", lease.TaskRunId);
+        activity?.SetTag("baton.definition_hash", lease.DefinitionHash);
+        if (services.GetService<AgentIdentity>() is { } identity)
+            activity?.SetTag("baton.host", identity.HostName);
+
+        using var scope = logger.BeginScope(new Dictionary<string, object>
+        {
+            ["baton.run.id"] = lease.WorkflowRunId,
+            ["baton.task.key"] = lease.TaskKey,
+            ["baton.attempt"] = lease.Attempt,
+        });
+
+        var result = await ExecuteCoreAsync(task, logger, activity, hostStopping);
+        activity?.SetTag("baton.outcome", result.Outcome.ToString());
+        if (result.Outcome is TaskOutcome.Failed or TaskOutcome.TimedOut)
+            activity?.SetStatus(ActivityStatusCode.Error, result.Error?.Message);
+        return result;
+    }
+
+    private async Task<TaskResult> ExecuteCoreAsync(RunningTask task, ILogger logger, Activity? activity, CancellationToken hostStopping)
+    {
         var lease = task.Lease;
         var timeout = lease.Timeout?.ToTimeSpan() ?? TaskDefaults.Timeout;
 
@@ -86,10 +130,12 @@ public sealed class TaskExecutor(IServiceProvider services, WorkflowSet workflow
         }
         catch (NonRetryableException ex)
         {
+            activity?.AddException(ex);
             return TaskResult.Failed(ex, retryable: false);
         }
         catch (Exception ex)
         {
+            activity?.AddException(ex);
             return TaskResult.Failed(ex, retryable: true);
         }
     }

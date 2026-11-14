@@ -370,9 +370,11 @@ Today's state, from the code:
     `TaskLease`. The change is additive: an old agent ignores the field and a new agent tolerates it being
     empty.
 28. **Handler span.** `TaskExecutor` starts `ActivitySource("Baton.Agent").StartActivity("baton.task.execute",
-    ActivityKind.Internal, parentContext: <parsed trace_parent>, links: [current claim activity])`.
-    - Tags: `baton.run.id`, `baton.task.key`, `baton.attempt`, `baton.host_group`, `baton.definition_hash`,
-      `baton.outcome`.
+    ActivityKind.Internal, parentContext: <parsed trace_parent>)`. It has no link to the claim: the
+    claim's RPC span has ended before the handler starts, and the run's trace is what an operator follows.
+    - Tags: `baton.run.id`, `baton.task.key`, `baton.attempt`, `baton.task_run.id`, `baton.host`,
+      `baton.definition_hash`, `baton.outcome`. The host group is not on the lease; the resource's
+      `service.instance.id` names the agent.
     - On failure: `ActivityStatusCode.Error` and `AddException`.
     - It wraps handler execution only, not lease renewals.
     - The agent → orchestrator gRPC calls already carry `traceparent`: grpc-dotnet sends through

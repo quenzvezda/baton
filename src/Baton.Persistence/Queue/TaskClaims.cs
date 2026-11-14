@@ -15,7 +15,8 @@ public sealed record ClaimedTask(
     long LeaseToken,
     TimeSpan Timeout,
     string ParametersJson,
-    IReadOnlyDictionary<string, string> UpstreamOutputs);
+    IReadOnlyDictionary<string, string> UpstreamOutputs,
+    string? TraceParent = null);
 
 /// <summary>The outcome of one claim: the host's group (to wait on) and the leases, possibly none.</summary>
 public sealed record ClaimResult(Guid HostGroupId, IReadOnlyList<ClaimedTask> Tasks);
@@ -109,7 +110,7 @@ public sealed class TaskClaims(NpgsqlDataSource dataSource, DefinitionGraphCache
 
     private const string TakeRoomSql = "UPDATE concurrency_limits SET in_use = in_use + @count WHERE key = @key";
 
-    private const string ParametersSql = "SELECT id, parameters::text FROM workflow_runs WHERE id = ANY (@runIds)";
+    private const string ParametersSql = "SELECT id, parameters::text, trace_parent FROM workflow_runs WHERE id = ANY (@runIds)";
 
     private const string OutputsSql = """
         SELECT workflow_run_id, task_key, output::text FROM task_runs
@@ -220,12 +221,17 @@ public sealed class TaskClaims(NpgsqlDataSource dataSource, DefinitionGraphCache
         }
 
         var parameters = new Dictionary<Guid, string>();
+        var traces = new Dictionary<Guid, string>();
         await using (var cmd = new NpgsqlCommand(ParametersSql, connection, transaction))
         {
             cmd.Parameters.AddWithValue("runIds", leased.Select(l => l.RunId).Distinct().ToArray());
             await using var reader = await cmd.ExecuteReaderAsync(ct);
             while (await reader.ReadAsync(ct))
+            {
                 parameters[reader.GetGuid(0)] = reader.GetString(1);
+                if (!reader.IsDBNull(2))
+                    traces[reader.GetGuid(0)] = reader.GetString(2);
+            }
         }
 
         var outputs = await ReadAncestorOutputsAsync(connection, transaction, leased.Select(l => (l.RunId, l.Key, l.Hash)), ct);
@@ -233,7 +239,7 @@ public sealed class TaskClaims(NpgsqlDataSource dataSource, DefinitionGraphCache
 
         return new ClaimResult(groupId, [.. leased.Select(l => new ClaimedTask(
             l.Id, l.RunId, l.Key, l.Hash, l.Attempt, l.Token, l.Timeout, parameters[l.RunId],
-            outputs.GetValueOrDefault((l.RunId, l.Key)) ?? new Dictionary<string, string>()))]);
+            outputs.GetValueOrDefault((l.RunId, l.Key)) ?? new Dictionary<string, string>(), traces.GetValueOrDefault(l.RunId)))]);
     }
 
     private async Task<Dictionary<(Guid RunId, string Key), Dictionary<string, string>>> ReadAncestorOutputsAsync(

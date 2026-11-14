@@ -42,9 +42,9 @@
 
 ## 6. Telemetry (OBS-06)
 
-- [ ] 6.1 `workflow_runs.trace_parent` written by `RunCreator`, `baton.trigger.fire` activity in `TriggerLoop`, lease query returns it, `TaskLease.trace_parent = 10` in `agent.proto` (decision 27); verify `Run_now_run_carries_the_request_trace`, `Cron_run_carries_the_trigger_trace`, and that `Old_agent_lease_without_trace_parent_still_runs` passes
-- [ ] 6.2 Handler span in `TaskExecutor` (decision 28); verify agent tests `Handler_attempt_is_a_span_in_the_run_trace`, `Failed_attempt_span_has_error_status_and_exception`, `Two_tasks_on_two_agents_share_one_trace` (integration)
-- [ ] 6.3 Handler log scope and export (decision 29); verify `Handler_log_record_carries_run_task_attempt_and_span` with a capturing logger provider, and that the existing OBS-03 log shipping tests still pass
+- [x] 6.1 `workflow_runs.trace_parent` written by `RunCreator`, `baton.trigger.fire` activity in `TriggerLoop`, lease query returns it, `TaskLease.trace_parent = 10` in `agent.proto` (decision 27); verify `Run_now_run_carries_the_request_trace`, `Cron_run_carries_the_trigger_trace`, and that `Old_agent_lease_without_trace_parent_still_runs` passes
+- [x] 6.2 Handler span in `TaskExecutor` (decision 28); verify agent tests `Handler_attempt_is_a_span_in_the_run_trace`, `Failed_attempt_span_has_error_status_and_exception`, `Two_tasks_on_two_agents_share_one_trace` (integration)
+- [x] 6.3 Handler log scope and export (decision 29); verify `Handler_log_record_carries_run_task_attempt_and_span` with a capturing logger provider, and that the existing OBS-03 log shipping tests still pass
 
 ## 7. Console
 
