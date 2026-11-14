@@ -19,11 +19,11 @@
 
 ## 3. Re-run failed tasks (WF-10)
 
-- [ ] 3.1 `POST /api/runs/{id}/retry-failed` with `RunRerun.RequestAsync` (decision 9); verify `Failed_run_is_rerun_as_pending`, `Timed_out_run_is_rerun_and_its_timeout_cleared`, `Rerun_of_a_run_in_another_state_is_409` (Running, Pending, Succeeded, Cancelled), `Viewer_cannot_rerun`
-- [ ] 3.2 Re-arming at admission with `RerunPlan` (decision 10); verify Testcontainers tests `Rerun_queues_the_failed_task_with_kept_upstream_outputs`, `Succeeded_tasks_are_not_run_again`, `Rerun_attempts_continue_with_a_fresh_budget`, `Rerun_keeps_the_idempotency_key`, `Rerun_uses_the_original_definition_version`, `Rerun_waits_for_the_automation_run_limit`, `Pinned_rerun_pins_again`
-- [ ] 3.3 Run outcome after a re-run; verify `Rerun_that_succeeds_ends_succeeded_and_releases_limits` and `Rerun_that_fails_again_can_be_rerun_again`
-- [ ] 3.4 Concurrency (decision 11); verify concurrent-actor tests `Two_simultaneous_reruns_give_one_202_and_one_409`, `Rerun_admitted_during_claims_leases_each_reset_root_once`, `Rerun_racing_the_reaper_is_rejected_or_rearms_after_it`
-- [ ] 3.5 Run detail returns `reruns`, attempts of all runs shown (spec "Run detail"); verify `Rerun_run_detail_shows_count_and_all_attempts`; document re-runs and the idempotency key meaning in the `TaskContext.IdempotencyKey` XML docs and `docs/runbooks/` (re-run section)
+- [x] 3.1 `POST /api/runs/{id}/retry-failed` with `RunRerun.RequestAsync` (decision 9); verify `Failed_run_is_rerun_as_pending`, `Timed_out_run_is_rerun_and_its_timeout_cleared`, `Rerun_of_a_run_in_another_state_is_409` (Running, Pending, Succeeded, Cancelled), `Viewer_cannot_rerun`
+- [x] 3.2 Re-arming at admission with `RerunPlan` (decision 10); verify Testcontainers tests `Rerun_queues_the_failed_task_with_kept_upstream_outputs`, `Succeeded_tasks_are_not_run_again`, `Rerun_attempts_continue_with_a_fresh_budget`, `Rerun_keeps_the_idempotency_key`, `Rerun_uses_the_original_definition_version`, `Rerun_waits_for_the_automation_run_limit`, `Pinned_rerun_pins_again`
+- [x] 3.3 Run outcome after a re-run; verify `Rerun_that_succeeds_ends_succeeded_and_releases_limits` and `Rerun_that_fails_again_can_be_rerun_again`
+- [x] 3.4 Concurrency (decision 11); verify concurrent-actor tests `Two_simultaneous_reruns_give_one_202_and_one_409`, `Rerun_admitted_during_claims_leases_each_reset_root_once`, `Rerun_racing_the_reaper_is_rejected_or_rearms_after_it`
+- [x] 3.5 Run detail returns `reruns`, attempts of all runs shown (spec "Run detail"); verify `Rerun_run_detail_shows_count_and_all_attempts`; document re-runs and the idempotency key meaning in the `TaskContext.IdempotencyKey` XML docs and `docs/runbooks/rerun-failed-runs.md`
 
 ## 4. Queue statistics (OBS-04)
 

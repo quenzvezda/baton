@@ -31,7 +31,7 @@ public sealed class RunAdmission(NpgsqlDataSource dataSource, RunMaterializer ma
         """;
 
     private const string LockRunSql = """
-        SELECT r.limit_keys, r.priority, r.required_labels, d.graph_hash, r.blocked_on
+        SELECT r.limit_keys, r.priority, r.required_labels, d.graph_hash, r.blocked_on, r.reruns
         FROM workflow_runs r JOIN workflow_definitions d ON d.id = r.definition_id
         WHERE r.id = @id AND r.status = 'pending'
         FOR UPDATE OF r SKIP LOCKED
@@ -123,6 +123,7 @@ public sealed class RunAdmission(NpgsqlDataSource dataSource, RunMaterializer ma
         short priority;
         string hash;
         string? blockedOn;
+        int reruns;
         await using (var lockRun = new NpgsqlCommand(LockRunSql, connection, transaction))
         {
             lockRun.Parameters.AddWithValue("id", runId);
@@ -134,6 +135,7 @@ public sealed class RunAdmission(NpgsqlDataSource dataSource, RunMaterializer ma
             labels = reader.GetFieldValue<string[]>(2);
             hash = reader.GetString(3);
             blockedOn = reader.IsDBNull(4) ? null : reader.GetString(4);
+            reruns = reader.GetInt32(5);
         }
 
         var reservation = await LimitRows.TryReserveAsync(connection, transaction, limitKeys, ct);
@@ -162,7 +164,16 @@ public sealed class RunAdmission(NpgsqlDataSource dataSource, RunMaterializer ma
         batch.BatchCommands.Add(RunEvents.Command(runId, null, RunEventTypes.RunStarted, null));
         await batch.ExecuteNonQueryAsync(ct);
 
-        await materializer.CreateTasksAsync(connection, transaction, runId, hash, groupId, priority, labels, ct);
+        if (reruns == 0)
+        {
+            await materializer.CreateTasksAsync(connection, transaction, runId, hash, groupId, priority, labels, ct);
+        }
+        else if (!await materializer.RearmTasksAsync(connection, transaction, runId, hash, groupId, ct))
+        {
+            // WF-10: nothing runs again (every reset task skipped at once), so the run ends in this transaction.
+            await RunFinalizer.FinalizeAndReleaseAsync(connection, transaction, runId, ct);
+        }
+
         await transaction.CommitAsync(ct);
         return new AdmitDecision(null);
     }

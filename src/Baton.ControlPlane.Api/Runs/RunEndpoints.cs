@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Net.ServerSentEvents;
 using System.Runtime.CompilerServices;
+using System.Security.Claims;
 using Baton.ControlPlane.Api.Security;
 using Baton.Persistence.Queue;
 using Baton.Persistence.Runs;
@@ -36,7 +37,33 @@ public static class RunEndpoints
         runs.MapGet("/{id:guid}", GetAsync).RequireAuthorization(BatonRoles.Viewer);
         runs.MapGet("/{id:guid}/tasks/{key}/logs", LogsAsync).RequireAuthorization(BatonRoles.Viewer);
         runs.MapPost("/{id:guid}/cancel", CancelAsync).RequireAuthorization(BatonRoles.Operator);
+        runs.MapPost("/{id:guid}/retry-failed", RetryFailedAsync).RequireAuthorization(BatonRoles.Operator);
         return app;
+    }
+
+    /// <summary>
+    /// WF-10 (M7 design.md decisions 2, 9): a Failed or TimedOut run goes back to Pending and through admission;
+    /// 202 with the run, 409 in any other state.
+    /// </summary>
+    private static async Task<Results<Accepted<RunDetail>, NotFound, Conflict<ProblemDetails>>> RetryFailedAsync(
+        Guid id, RunRerun rerun, RunQueries queries, ClaimsPrincipal user, CancellationToken ct)
+    {
+        switch (await rerun.RequestAsync(id, Actor.From(user).Name, ct))
+        {
+            case RerunOutcome.NotFound:
+                return TypedResults.NotFound();
+            case RerunOutcome.NotRerunnable:
+                return TypedResults.Conflict(new ProblemDetails
+                {
+                    Title = "Run cannot be re-run",
+                    Detail = "Only a failed or timed-out run can be re-run.",
+                    Status = StatusCodes.Status409Conflict,
+                });
+            default:
+                return await queries.FindAsync(id, ct) is { } run
+                    ? TypedResults.Accepted($"/api/runs/{id}", run)
+                    : TypedResults.NotFound();
+        }
     }
 
     /// <summary>OBS-01: newest first; <c>status</c> may repeat; <c>to</c> is exclusive.</summary>

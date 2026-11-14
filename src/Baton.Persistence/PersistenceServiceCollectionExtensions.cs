@@ -36,6 +36,7 @@ public static class PersistenceServiceCollectionExtensions
         services.AddSingleton<RetryPromoter>();
         services.AddSingleton<RunCreator>();
         services.AddSingleton<RunCancellation>();
+        services.AddSingleton<RunRerun>();
         services.AddSingleton<CronTriggers>();
         services.AddSingleton<RunAdmission>();
         services.AddSingleton<RunQueries>();

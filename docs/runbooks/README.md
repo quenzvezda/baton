@@ -12,6 +12,7 @@ behaves under the same failures.
 | [Postgres outage and restart](postgres-outage.md) | API 5xx, orchestrator `/healthz` unhealthy, agents log failed heartbeats |
 | [Agent rollout](agent-rollout.md) | Upgrading or replacing agents without failing runs |
 | [Backup and restore](backup-restore.md) | Taking, protecting and restoring a backup |
+| [Re-run a failed run](rerun-failed-runs.md) | A run Failed or TimedOut for a transient cause and should finish without repeating its successful tasks |
 
 ## Signals
 
