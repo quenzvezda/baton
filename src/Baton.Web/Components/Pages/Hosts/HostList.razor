@@ -9,6 +9,40 @@
     <button type="button" disabled="@_busy" @onclick="LoadAsync">Refresh</button>
 </div>
 <ErrorMessage Text="@_error" />
+@if (_groups is { Count: > 0 })
+{
+    <h2>Host groups</h2>
+    <table class="grid" data-groups>
+        <thead>
+            <tr><th>Group</th><th>Dispatch</th><th>Hosts</th>
+                @if (_canOperate) { <th><span class="visually-hidden">Actions</span></th> }</tr>
+        </thead>
+        <tbody>
+            @foreach (var group in _groups)
+            {
+                <tr data-group="@group.Id">
+                    <td>@group.Name</td>
+                    <td><StatusBadge Status="@(group.DispatchPaused ? "paused" : "dispatching")" /></td>
+                    <td>@(_hosts?.Count(h => h.HostGroupId == group.Id) ?? 0)</td>
+                    @if (_canOperate)
+                    {
+                        <td class="actions">
+                            @if (group.DispatchPaused)
+                            {
+                                <button type="button" disabled="@_busy" @onclick="() => SetPausedAsync(group, false)">Resume</button>
+                            }
+                            else
+                            {
+                                <button type="button" disabled="@_busy" @onclick="() => SetPausedAsync(group, true)">Pause</button>
+                            }
+                        </td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+    <h2>Hosts</h2>
+}
 @if (_hosts is null)
 {
     <p class="muted">Loading…</p>
@@ -66,6 +100,7 @@ else
 
 @code {
     private IReadOnlyList<HostInfo>? _hosts;
+    private IReadOnlyList<HostGroup>? _groups;
     private bool _canOperate;
     private bool _busy;
     private string? _error;
@@ -76,9 +111,20 @@ else
         await LoadAsync();
     }
 
-    private async Task LoadAsync() => await RunAsync(async () => _hosts = await Api.ListHostsAsync());
+    private async Task LoadAsync() => await RunAsync(async () =>
+    {
+        _groups = await Api.ListHostGroupsAsync();
+        _hosts = await Api.ListHostsAsync();
+    });
 
-    /// <summary>HST-04: the agent stops claiming at its next heartbeat; running tasks finish.</summary>
+    /// <summary>ORC-13: a paused group's hosts get no new tasks; running tasks finish. Resume wakes waiting agents.</summary>
+    private Task SetPausedAsync(HostGroup group, bool paused) => RunAsync(async () =>
+    {
+        await Api.SetHostGroupPausedAsync(group.Id, paused);
+        _groups = await Api.ListHostGroupsAsync();
+    });
+
+    /// <summary>HST-04: the host takes no new tasks (except those of runs pinned to it, ORC-12); running tasks finish.</summary>
     private Task DrainAsync(HostInfo host) => RunAsync(async () =>
     {
         await Api.DrainHostAsync(host.Id);

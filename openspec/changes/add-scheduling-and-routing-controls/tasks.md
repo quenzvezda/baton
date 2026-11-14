@@ -34,9 +34,9 @@
 
 ## 6. Console
 
-- [ ] 6.1 Automation editor: misfire select, catch-up limit shown for CatchUp (default 3), placement select (decision 15); verify bUnit tests `Catch_up_limit_appears_only_for_CatchUp` and `Placement_is_saved_and_shown_again`
-- [ ] 6.2 Editor fire time preview, debounced, with the server's message on invalid input; verify bUnit tests `Preview_lists_the_next_5_fire_times` and `Invalid_expression_shows_the_message_instead_of_times`
-- [ ] 6.3 Hosts page group rows with paused badge and Pause/Resume for Operator and Admin; verify bUnit tests `Operator_pauses_a_group_from_the_hosts_page` and `Viewer_sees_paused_state_without_actions`
+- [x] 6.1 Automation editor: misfire select, catch-up limit shown for CatchUp (default 3), placement select (decision 15); verify bUnit tests `Catch_up_limit_appears_only_for_CatchUp` and `Placement_is_saved_and_shown_again`
+- [x] 6.2 Editor fire time preview, debounced, with the server's message on invalid input; verify bUnit tests `Preview_lists_the_next_5_fire_times` and `Invalid_expression_shows_the_message_instead_of_times`
+- [x] 6.3 Hosts page group rows with paused badge and Pause/Resume for Operator and Admin; verify bUnit tests `Operator_pauses_a_group_from_the_hosts_page` and `Viewer_sees_paused_state_without_actions`
 
 ## 7. Close
 

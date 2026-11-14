@@ -39,7 +39,9 @@ public sealed record HostInfo(
     DateTimeOffset LastHeartbeatAt,
     DateTimeOffset RegisteredAt);
 
-public sealed record TriggerRequest(Guid? Id, string? Kind, string? CronExpression = null, string? TimeZone = null, bool? Enabled = null);
+public sealed record TriggerRequest(
+    Guid? Id, string? Kind, string? CronExpression = null, string? TimeZone = null, bool? Enabled = null,
+    string? MisfirePolicy = null, int? CatchUpLimit = null);
 
 public sealed record AutomationRequest(
     string? Name,
@@ -54,7 +56,8 @@ public sealed record AutomationRequest(
     int? Priority = null,
     int? MaxConcurrentRuns = null,
     string? ConcurrencyPolicy = null,
-    TimeSpan? RunTimeout = null);
+    TimeSpan? RunTimeout = null,
+    string? PlacementMode = null);
 
 public sealed record TriggerInfo(
     Guid Id,
@@ -65,7 +68,9 @@ public sealed record TriggerInfo(
     DateTimeOffset? NextFireAt,
     DateTimeOffset? LastFiredAt,
     string? WebhookUrl,
-    string? WebhookSecret);
+    string? WebhookSecret,
+    string? MisfirePolicy = null,
+    int? CatchUpLimit = null);
 
 public sealed record Automation(
     Guid Id,
@@ -84,7 +89,11 @@ public sealed record Automation(
     TimeSpan? RunTimeout,
     DateTimeOffset UpdatedAt,
     int Version,
-    IReadOnlyList<TriggerInfo> Triggers);
+    IReadOnlyList<TriggerInfo> Triggers,
+    string PlacementMode = "per_task");
+
+/// <summary>One upcoming fire time of a cron expression (AUT-10): the instant and the wall clock in its zone.</summary>
+public sealed record FireTimePreview(DateTimeOffset At, string Local, string Offset);
 
 public sealed record RunAccepted(Guid RunId);
 

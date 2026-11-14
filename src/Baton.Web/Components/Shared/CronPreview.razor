@@ -1,0 +1,103 @@
+@using System.Globalization
+@implements IDisposable
+@inject IBatonApi Api
+
+@* AUT-10: the next fire times of a cron trigger, refreshed (debounced) while its expression or zone is edited. *@
+@if (_times.Count > 0)
+{
+    <div class="preview" data-preview>
+        <span class="muted">Next fire times</span>
+        <ol>
+            @foreach (var time in _times)
+            {
+                <li><span class="mono">@Format(time.Local)</span> <span class="muted">(UTC@(time.Offset)) · @time.At.UtcDateTime.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) UTC</span></li>
+            }
+        </ol>
+    </div>
+}
+else if (_loaded && _errors.Count == 0)
+{
+    <div class="preview muted" data-preview>This expression never fires again.</div>
+}
+
+@code {
+    private CancellationTokenSource? _pending;
+    private IReadOnlyList<FireTimePreview> _times = [];
+    private IReadOnlyDictionary<string, string> _errors = new Dictionary<string, string>();
+    private (string?, string?) _shown;
+    private bool _loaded;
+
+    [Parameter] public string? Expression { get; set; }
+
+    [Parameter] public string? TimeZone { get; set; }
+
+    /// <summary>How long typing must pause before the preview is fetched.</summary>
+    [Parameter] public TimeSpan Debounce { get; set; } = TimeSpan.FromMilliseconds(400);
+
+    /// <summary>The server's messages keyed <c>cronExpression</c> / <c>timeZone</c>, empty when the input is valid.</summary>
+    [Parameter] public EventCallback<IReadOnlyDictionary<string, string>> ErrorsChanged { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        var input = (Expression?.Trim(), TimeZone?.Trim());
+        if (input == _shown)
+            return;
+        _shown = input;
+
+        _pending?.Cancel();
+        _pending?.Dispose();
+        _pending = new CancellationTokenSource();
+        _ = RefreshAsync(input.Item1, input.Item2, _pending.Token);
+    }
+
+    private async Task RefreshAsync(string? expression, string? zone, CancellationToken ct)
+    {
+        try
+        {
+            if (Debounce > TimeSpan.Zero)
+                await Task.Delay(Debounce, ct);
+
+            IReadOnlyList<FireTimePreview> times = [];
+            IReadOnlyDictionary<string, string> errors = new Dictionary<string, string>();
+            if (!string.IsNullOrEmpty(expression) && !string.IsNullOrEmpty(zone))
+            {
+                try
+                {
+                    times = await Api.PreviewFireTimesAsync(expression, zone, ct);
+                }
+                catch (ApiException ex) when (ex.Errors.Count > 0)
+                {
+                    errors = ex.Errors.ToDictionary(e => e.Key, e => string.Join(" ", e.Value), StringComparer.Ordinal);
+                }
+            }
+
+            if (ct.IsCancellationRequested)
+                return;
+            await InvokeAsync(async () =>
+            {
+                (_times, _errors, _loaded) = (times, errors, !string.IsNullOrEmpty(expression) && !string.IsNullOrEmpty(zone));
+                await ErrorsChanged.InvokeAsync(errors);
+                StateHasChanged();
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            // Superseded by newer input.
+        }
+        catch (ApiException)
+        {
+            // The preview is a convenience; saving reports real problems.
+        }
+    }
+
+    private static string Format(string local) =>
+        DateTime.TryParse(local, CultureInfo.InvariantCulture, DateTimeStyles.None, out var time)
+            ? time.ToString("ddd yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)
+            : local;
+
+    public void Dispose()
+    {
+        _pending?.Cancel();
+        _pending?.Dispose();
+    }
+}

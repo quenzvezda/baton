@@ -38,6 +38,16 @@ public sealed class BatonApiClient(HttpClient http, AccessTokenProvider tokens) 
 
     public Task UndrainHostAsync(Guid hostId, CancellationToken ct = default) => SendAsync(HttpMethod.Post, $"api/hosts/{hostId}/undrain", ct);
 
+    public async Task<HostGroup> SetHostGroupPausedAsync(Guid groupId, bool paused, CancellationToken ct = default)
+    {
+        using var message = new HttpRequestMessage(HttpMethod.Post, $"api/host-groups/{groupId}/{(paused ? "pause" : "resume")}");
+        return await ReadAsync<HostGroup>(await SendAsync(message, ct), ct);
+    }
+
+    public Task<IReadOnlyList<FireTimePreview>> PreviewFireTimesAsync(string expression, string timeZone, CancellationToken ct = default) =>
+        GetAsync<IReadOnlyList<FireTimePreview>>(
+            $"api/cron/preview?expression={Uri.EscapeDataString(expression)}&timeZone={Uri.EscapeDataString(timeZone)}", ct);
+
     public Task<IReadOnlyList<Automation>> ListAutomationsAsync(CancellationToken ct = default) =>
         GetAsync<IReadOnlyList<Automation>>("api/automations", ct);
 

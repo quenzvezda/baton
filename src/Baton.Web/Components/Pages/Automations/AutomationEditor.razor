@@ -132,16 +132,35 @@ else
                     <strong>@trigger.Kind</strong>
                     @if (trigger.Kind == "cron")
                     {
-                        <div class="field@Invalid($"triggers[{index}].cronExpression")">
+                        <div class="field@Invalid($"triggers[{index}].cronExpression", trigger, "cronExpression")">
                             <label for="@($"cron-{index}")">Cron expression</label>
-                            <input id="@($"cron-{index}")" @bind="trigger.CronExpression" placeholder="0 2 * * *" class="mono" />
-                            <FieldError Text="@Error($"triggers[{index}].cronExpression")" />
+                            <input id="@($"cron-{index}")" @bind="trigger.CronExpression" @bind:event="oninput" placeholder="0 2 * * *" class="mono" />
+                            <FieldError Text="@TriggerError(index, trigger, "cronExpression")" />
                         </div>
-                        <div class="field@Invalid($"triggers[{index}].timeZone")">
+                        <div class="field@Invalid($"triggers[{index}].timeZone", trigger, "timeZone")">
                             <label for="@($"tz-{index}")">Time zone</label>
-                            <input id="@($"tz-{index}")" @bind="trigger.TimeZone" placeholder="Europe/Amsterdam" />
-                            <FieldError Text="@Error($"triggers[{index}].timeZone")" />
+                            <input id="@($"tz-{index}")" @bind="trigger.TimeZone" @bind:event="oninput" placeholder="Europe/Amsterdam" />
+                            <FieldError Text="@TriggerError(index, trigger, "timeZone")" />
                         </div>
+                        <div class="field@Invalid($"triggers[{index}].misfirePolicy")">
+                            <label for="@($"misfire-{index}")">After downtime</label>
+                            <select id="@($"misfire-{index}")" @bind="trigger.MisfirePolicy" @bind:after="trigger.MisfirePolicyChanged">
+                                <option value="fire_once">Run once for the latest missed time</option>
+                                <option value="skip">Skip missed times</option>
+                                <option value="catch_up">Catch up the latest missed times</option>
+                            </select>
+                            <FieldError Text="@Error($"triggers[{index}].misfirePolicy")" />
+                        </div>
+                        @if (trigger.MisfirePolicy == "catch_up")
+                        {
+                            <div class="field narrow@Invalid($"triggers[{index}].catchUpLimit")">
+                                <label for="@($"catch-up-{index}")">Catch up at most (1–10)</label>
+                                <input id="@($"catch-up-{index}")" type="number" min="1" max="10" @bind="trigger.CatchUpLimit" />
+                                <FieldError Text="@Error($"triggers[{index}].catchUpLimit")" />
+                            </div>
+                        }
+                        <CronPreview Expression="@trigger.CronExpression" TimeZone="@trigger.TimeZone" Debounce="PreviewDebounce"
+                                     ErrorsChanged="@(errors => _previewErrors[trigger] = errors)" />
                     }
                     else if (trigger.Kind == "manual")
                     {
@@ -194,6 +213,14 @@ else
                 </div>
             </div>
             <div class="row">
+                <div class="field@Invalid("placementMode")">
+                    <label for="placement">Placement</label>
+                    <select id="placement" @bind="_draft.PlacementMode">
+                        <option value="per_task">Each task on any eligible host</option>
+                        <option value="pinned_run">Every task of a run on one host</option>
+                    </select>
+                    <FieldError Text="@Error("placementMode")" />
+                </div>
                 <div class="field@Invalid("runTimeout")">
                     <label for="timeout">Run timeout (hh:mm:ss)</label>
                     <input id="timeout" @bind="_draft.RunTimeout" placeholder="none" class="mono" />
@@ -223,6 +250,7 @@ else
     private readonly Dictionary<string, string> _paramErrors = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _otherErrors = new(StringComparer.Ordinal);
     private readonly List<string> _issuedSecrets = [];
+    private readonly Dictionary<TriggerDraft, IReadOnlyDictionary<string, string>> _previewErrors = [];
     private IReadOnlyList<WorkflowSummary> _workflows = [];
     private IReadOnlyList<HostGroup> _groups = [];
     private IReadOnlyList<int> _versions = [];
@@ -238,6 +266,9 @@ else
     private string? _message;
 
     [Parameter] public Guid? Id { get; set; }
+
+    /// <summary>How long typing in a cron trigger must pause before its fire times are previewed (AUT-10).</summary>
+    [Parameter] public TimeSpan PreviewDebounce { get; set; } = TimeSpan.FromMilliseconds(400);
 
     protected override async Task OnParametersSetAsync()
     {
@@ -433,4 +464,14 @@ else
     private string? Error(string key) => _errors.GetValueOrDefault(key);
 
     private string Invalid(string key) => _errors.ContainsKey(key) ? " invalid" : "";
+
+    private string Invalid(string key, TriggerDraft trigger, string field) =>
+        _errors.ContainsKey(key) || PreviewError(trigger, field) is not null ? " invalid" : "";
+
+    /// <summary>The save's error for the field, else the live preview's (AUT-10: the server's message next to the field).</summary>
+    private string? TriggerError(int index, TriggerDraft trigger, string field) =>
+        Error($"triggers[{index}].{field}") ?? PreviewError(trigger, field);
+
+    private string? PreviewError(TriggerDraft trigger, string field) =>
+        _previewErrors.TryGetValue(trigger, out var errors) ? errors.GetValueOrDefault(field) : null;
 }

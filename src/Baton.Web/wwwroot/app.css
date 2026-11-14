@@ -105,7 +105,7 @@ td.actions > * + * { margin-left: 0.4rem; }
 .state-waiting, .state-pending, .state-disabled { --state-bg: var(--s-waiting-bg); --state-fg: var(--s-waiting-fg); }
 .state-queued, .state-leased { --state-bg: var(--s-queued-bg); --state-fg: var(--s-queued-fg); }
 .state-running, .state-online, .state-enabled { --state-bg: var(--s-running-bg); --state-fg: var(--s-running-fg); }
-.state-retry-wait, .state-cancelling, .state-draining, .state-lost { --state-bg: var(--s-retry-bg); --state-fg: var(--s-retry-fg); }
+.state-retry-wait, .state-cancelling, .state-draining, .state-lost, .state-paused { --state-bg: var(--s-retry-bg); --state-fg: var(--s-retry-fg); }
 .state-succeeded { --state-bg: var(--s-success-bg); --state-fg: var(--s-success-fg); }
 .state-failed, .state-timed-out, .state-offline { --state-bg: var(--s-failed-bg); --state-fg: var(--s-failed-fg); }
 .state-skipped { --state-bg: var(--s-skipped-bg); --state-fg: var(--s-skipped-fg); }
@@ -159,6 +159,9 @@ form.editor legend { font-weight: 600; padding: 0 0.3rem; }
 .row > .field { flex: 1; }
 .trigger { display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap; padding: 0.5rem 0; border-bottom: 1px dashed var(--border); }
 .trigger strong { align-self: center; min-width: 5rem; }
+.trigger .field.narrow { min-width: 8rem; flex: 0 0 auto; }
+.trigger .preview { flex-basis: 100%; font-size: 0.85rem; }
+.trigger .preview ol { margin: 0.2rem 0 0; padding-left: 1.4rem; }
 
 form.filters { display: flex; flex-wrap: wrap; gap: 0 1rem; align-items: flex-end; background: var(--surface);
     border: 1px solid var(--border); border-radius: 8px; padding: 0.8rem 1rem 0; margin-bottom: 1rem; }

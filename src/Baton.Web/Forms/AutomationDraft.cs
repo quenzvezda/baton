@@ -13,6 +13,19 @@ public sealed class TriggerDraft
     public string? TimeZone { get; set; }
     public bool Enabled { get; set; } = true;
     public string? WebhookUrl { get; set; }
+
+    /// <summary>Cron only (AUT-08): <c>fire_once</c>, <c>skip</c> or <c>catch_up</c>.</summary>
+    public string MisfirePolicy { get; set; } = "fire_once";
+
+    /// <summary>Sent only for <c>catch_up</c>.</summary>
+    public int? CatchUpLimit { get; set; }
+
+    /// <summary>Switching to CatchUp fills in the default limit of 3 (the editor's "Catch-up limit only for CatchUp").</summary>
+    public void MisfirePolicyChanged()
+    {
+        if (MisfirePolicy == "catch_up")
+            CatchUpLimit ??= 3;
+    }
 }
 
 /// <summary>The automation editor's inputs as text, so a rejected save keeps what was typed (AUT-03).</summary>
@@ -22,7 +35,7 @@ public sealed class AutomationDraft
     public static readonly IReadOnlySet<string> Fields = new HashSet<string>(StringComparer.Ordinal)
     {
         "name", "description", "workflowKey", "workflowVersion", "hostGroupId", "priority", "maxConcurrentRuns",
-        "concurrencyPolicy", "runTimeout", "requiredLabels", "triggers",
+        "concurrencyPolicy", "runTimeout", "requiredLabels", "triggers", "placementMode",
     };
 
     public string Name { get; set; } = "";
@@ -36,6 +49,10 @@ public sealed class AutomationDraft
     public string? RunTimeout { get; set; }
     public string? RequiredLabels { get; set; }
     public bool Enabled { get; set; } = true;
+
+    /// <summary>ORC-12: <c>per_task</c> or <c>pinned_run</c>.</summary>
+    public string PlacementMode { get; set; } = "per_task";
+
     public List<TriggerDraft> Triggers { get; } = [];
 
     public void Load(Automation automation)
@@ -52,6 +69,7 @@ public sealed class AutomationDraft
         RunTimeout = automation.RunTimeout?.ToString("c", CultureInfo.InvariantCulture);
         RequiredLabels = string.Join(", ", automation.RequiredLabels);
         Enabled = automation.Enabled;
+        PlacementMode = automation.PlacementMode;
         Triggers.Clear();
         Triggers.AddRange(automation.Triggers.Select(t => new TriggerDraft
         {
@@ -61,6 +79,8 @@ public sealed class AutomationDraft
             TimeZone = t.TimeZone,
             Enabled = t.Enabled,
             WebhookUrl = t.WebhookUrl,
+            MisfirePolicy = t.MisfirePolicy ?? "fire_once",
+            CatchUpLimit = t.CatchUpLimit,
         }));
     }
 
@@ -89,7 +109,9 @@ public sealed class AutomationDraft
             [.. Triggers.Select(t => new TriggerRequest(t.Id, t.Kind,
                 t.Kind == "cron" ? t.CronExpression?.Trim() : null,
                 t.Kind == "cron" ? t.TimeZone?.Trim() : null,
-                t.Enabled))],
+                t.Enabled,
+                t.Kind == "cron" ? t.MisfirePolicy : null,
+                t.Kind == "cron" && t.MisfirePolicy == "catch_up" ? t.CatchUpLimit : null))],
             string.IsNullOrWhiteSpace(Description) ? null : Description,
             Enabled,
             WorkflowVersion,
@@ -98,7 +120,8 @@ public sealed class AutomationDraft
             Priority,
             MaxConcurrentRuns,
             ConcurrencyPolicy,
-            timeout);
+            timeout,
+            PlacementMode);
         return errors.Count == 0;
     }
 }

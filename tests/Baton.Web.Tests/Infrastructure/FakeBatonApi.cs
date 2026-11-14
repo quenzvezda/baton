@@ -24,6 +24,12 @@ internal sealed class FakeBatonApi : IBatonApi
     public List<AutomationRequest> SavedRequests { get; } = [];
     public List<Guid> Cancelled { get; } = [];
     public List<Guid> Drained { get; } = [];
+    public List<string> Previewed { get; } = [];
+
+    /// <summary>Answers a fire-time preview; the default returns 5 daily times at the typed expression's 02:00.</summary>
+    public Func<string, string, IReadOnlyList<FireTimePreview>> Preview { get; set; } = (_, _) =>
+        [.. Enumerable.Range(1, 5).Select(d => new FireTimePreview(
+            new DateTimeOffset(2026, 11, 14 + d, 18, 0, 0, TimeSpan.Zero), $"2026-11-{15 + d:00}T02:00:00", "+08:00"))];
 
     /// <summary>Thrown by the next create or update, as the API would reject the body.</summary>
     public ApiException? RejectNextSave { get; set; }
@@ -49,6 +55,19 @@ internal sealed class FakeBatonApi : IBatonApi
         var index = Hosts.FindIndex(h => h.Id == hostId);
         Hosts[index] = Hosts[index] with { DrainRequested = true, Status = "draining" };
         return Task.CompletedTask;
+    }
+
+    public Task<HostGroup> SetHostGroupPausedAsync(Guid groupId, bool paused, CancellationToken ct = default)
+    {
+        var index = HostGroups.FindIndex(g => g.Id == groupId);
+        HostGroups[index] = HostGroups[index] with { DispatchPaused = paused };
+        return Task.FromResult(HostGroups[index]);
+    }
+
+    public Task<IReadOnlyList<FireTimePreview>> PreviewFireTimesAsync(string expression, string timeZone, CancellationToken ct = default)
+    {
+        Previewed.Add($"{expression}|{timeZone}");
+        return Task.FromResult(Preview(expression, timeZone));
     }
 
     public Task UndrainHostAsync(Guid hostId, CancellationToken ct = default)
@@ -127,7 +146,11 @@ internal sealed class FakeBatonApi : IBatonApi
             id ?? Guid.CreateVersion7(), request.Name!, request.Description, request.Enabled ?? true, "tester", request.WorkflowKey!,
             request.WorkflowVersion, request.Parameters ?? default, request.HostGroupId!.Value, request.RequiredLabels ?? [],
             request.Priority ?? 50, request.MaxConcurrentRuns ?? 1, request.ConcurrencyPolicy ?? "skip", request.RunTimeout,
-            DateTimeOffset.UtcNow, 1, []);
+            DateTimeOffset.UtcNow, 1,
+            [.. (request.Triggers ?? []).Select(t => new TriggerInfo(t.Id ?? Guid.CreateVersion7(), t.Kind!, t.CronExpression, t.TimeZone,
+                t.Enabled ?? true, null, null, null, null, t.Kind == "cron" ? t.MisfirePolicy ?? "fire_once" : null,
+                t.MisfirePolicy == "catch_up" ? t.CatchUpLimit ?? 3 : null))],
+            request.PlacementMode ?? "per_task");
         Automations.RemoveAll(a => a.Id == automation.Id);
         Automations.Add(automation);
         return Task.FromResult(automation);

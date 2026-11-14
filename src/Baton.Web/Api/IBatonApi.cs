@@ -20,6 +20,12 @@ public interface IBatonApi
 
     Task UndrainHostAsync(Guid hostId, CancellationToken ct = default);
 
+    /// <summary>ORC-13: pauses or resumes dispatch for the group; returns the group as it is now.</summary>
+    Task<HostGroup> SetHostGroupPausedAsync(Guid groupId, bool paused, CancellationToken ct = default);
+
+    /// <summary>AUT-10: the next fire times; an invalid expression or zone fails with field errors.</summary>
+    Task<IReadOnlyList<FireTimePreview>> PreviewFireTimesAsync(string expression, string timeZone, CancellationToken ct = default);
+
     Task<IReadOnlyList<Automation>> ListAutomationsAsync(CancellationToken ct = default);
 
     Task<Automation?> GetAutomationAsync(Guid id, CancellationToken ct = default);
