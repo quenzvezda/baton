@@ -17,7 +17,7 @@
 - [x] 3.1 `AgingLoop` (decision 9) with `Dispatch:AgingStep` and `Dispatch:AgingCap` validated at startup; verify Testcontainers tests `Queued_task_ages_one_point_per_step`, `Unchanged_rows_are_not_written` (row versions unchanged by a second tick), `Aged_task_overtakes_a_newer_higher_base_task`, and `Invalid_aging_settings_fail_startup`
 - [x] 3.2 Re-queued tasks start from base priority in `RetryPromoter` and `TaskFinisher` (decision 10); verify `Retry_starts_again_from_base_priority`
 - [x] 3.3 Aging next to claims never blocks and never double-leases; verify the concurrent-actor integration test `Aging_ticks_during_concurrent_claims_skip_locked_rows` (several claimers plus the loop, every task leased once)
-- [ ] 3.4 Measure aging under the G1 load profile with a 30 s step so it writes (M6 exit criterion "only changed rows updated"): rows written per tick, `ix_tasks_dispatch` size and p95 Queued→Leased against the G1 report; verify by `docs/reports/m6-aging-load.md` with the numbers and the command used
+- [x] 3.4 Measure aging under the G1 load profile with a 30 s step so it writes (M6 exit criterion "only changed rows updated"): rows written per tick, `ix_tasks_dispatch` size and p95 Queued→Leased against the G1 report; verify by `docs/reports/m6-aging-load.md` with the numbers and the command used
 
 ## 4. Placement mode (ORC-12)
 
