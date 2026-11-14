@@ -198,9 +198,9 @@ public sealed class AdmissionTests(PostgresFixture pg)
             {
                 foreach (var (groupId, host) in groups)
                 {
-                    var claimed = await claims.ClaimAsync(groupId, host, 50, CancellationToken.None);
+                    var claimed = await claims.ClaimAsync(new AgentCredential(Guid.Empty, groupId), host, 50, CancellationToken.None);
                     await Task.WhenAll(claimed!.Tasks.Select(t =>
-                        leases.CompleteAsync(groupId, DispatchScenario.Report(t.TaskRunId, t.LeaseToken, Baton.Domain.Runs.AttemptOutcome.Succeeded), CancellationToken.None)));
+                        leases.CompleteAsync(new AgentCredential(Guid.Empty, groupId), DispatchScenario.Report(t.TaskRunId, t.LeaseToken, Baton.Domain.Runs.AttemptOutcome.Succeeded), CancellationToken.None)));
                 }
 
                 await Task.Delay(5);

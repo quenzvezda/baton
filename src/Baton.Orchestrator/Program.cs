@@ -11,15 +11,18 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddBatonTelemetry("orchestrator");
 builder.Services.AddBatonPersistence(builder.Configuration.GetConnectionString("Baton"));
 builder.Services.AddBatonListenDataSource(builder.Configuration.GetConnectionString("BatonListen"));
-builder.Services.AddHealthChecks().AddCheck<PostgresHealthCheck>("postgres");
+builder.Services.AddHealthChecks()
+    .AddCheck<PostgresHealthCheck>("postgres")
+    .AddCheck<HistoryPartitionsHealthCheck>("history-partitions");
 builder.Services.AddAgentProtocol(builder.Configuration);
 
 // Loops land per milestone (design spec §8 "Orchestrator loops", ADR-0008):
-//   M0: PartitionMaintenanceLoop (daily, singleton)
+//   M0: PartitionMaintenanceLoop (daily, singleton; G1 adds the 90-day retention)
 //   M3: ReaperLoop (5 s, SKIP LOCKED; M4 adds cancel grace and run deadlines), RetryPromoterLoop (1 s, SKIP LOCKED),
 //       LimitReconcilerLoop (5 min, singleton), TasksReadyListener (LISTEN for claims)
 //   M4: TriggerLoop (1 s, SKIP LOCKED), AdmissionLoop (1 s, advisory lock per group)
 //   M6: AgingLoop (30 s, singleton)
+builder.Services.AddOrchestratorMetrics();
 builder.Services.AddHostedService<PartitionMaintenanceLoop>();
 builder.Services.AddDispatchLoops();
 
@@ -32,9 +35,15 @@ app.MapHealthChecks("/healthz", new HealthCheckOptions
 {
     ResponseWriter = (context, report) => context.Response.WriteAsJsonAsync(new
     {
-        status = report.Status == HealthStatus.Healthy ? "ok" : "unhealthy",
+        status = report.Status switch
+        {
+            HealthStatus.Healthy => "ok",
+            HealthStatus.Degraded => "degraded",
+            _ => "unhealthy",
+        },
         service = "orchestrator",
         checks = report.Entries.ToDictionary(e => e.Key, e => e.Value.Status.ToString()),
+        details = report.Entries.Where(e => e.Value.Description is not null).ToDictionary(e => e.Key, e => e.Value.Description),
     }),
 });
 

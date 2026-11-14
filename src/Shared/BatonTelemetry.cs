@@ -12,7 +12,7 @@ namespace Baton.Telemetry;
 
 /// <summary>
 /// OpenTelemetry baseline shared by the server processes (design spec §8): ASP.NET Core, HttpClient and
-/// Npgsql traces and metrics, plus logs. Linked into each project as source. Instrumentation always
+/// Npgsql traces and metrics, Baton's own meters (<c>Baton.*</c>), plus logs. Linked into each project as source. Instrumentation always
 /// runs; export is off unless <c>OTEL_EXPORTER_OTLP_ENDPOINT</c> is set (environment variable or
 /// configuration), so local runs need no collector. Other <c>OTEL_*</c> settings apply as usual.
 /// </summary>
@@ -28,6 +28,7 @@ internal static class BatonTelemetry
                 .AddHttpClientInstrumentation()
                 .AddNpgsql())
             .WithMetrics(metrics => metrics
+                .AddMeter("Baton.*")
                 .AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation()
                 .AddNpgsqlInstrumentation());

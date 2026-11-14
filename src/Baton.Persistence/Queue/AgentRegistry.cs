@@ -135,6 +135,7 @@ public sealed class AgentRegistry(NpgsqlDataSource dataSource)
         await using var cmd = dataSource.CreateCommand(HeartbeatSql);
         cmd.Parameters.AddWithValue("hostId", hostId);
         cmd.Parameters.AddWithValue("credentialGroupId", credential.HostGroupId);
+        cmd.Parameters.AddWithValue("credentialId", credential.Id);
         cmd.Parameters.AddWithValue("shuttingDown", shuttingDown);
         return await cmd.ExecuteScalarAsync(ct) is bool drained ? drained : null;
     }

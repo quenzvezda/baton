@@ -30,12 +30,13 @@ public static class HostSql
     public static string IsEligible(string alias) => $"(({DerivedStatus(alias)}) = '{HostStatus.Online}')";
 
     /// <summary>
-    /// A credential of group <c>@credentialGroupId</c> may act for the host when that is the host's group or
-    /// the group of the credential the host registered with (ADR-0013, design.md decision 7).
+    /// A credential may act for the host when its group <c>@credentialGroupId</c> is the host's group, or
+    /// when it is the very credential <c>@credentialId</c> the host registered with (ADR-0013, M2 design.md
+    /// decision 7), so a moved host keeps working with its old token. Matching the bound credential by id —
+    /// not by group — keeps other tokens of the host's former group out (G1 security review M1); the
+    /// caller's credential is known to be unrevoked because it passed the auth interceptor.
     /// </summary>
     public static string MayActFor(string alias) => $"""
-        ({alias}.host_group_id = @credentialGroupId
-         OR EXISTS (SELECT 1 FROM agent_credentials bound
-                    WHERE bound.id = {alias}.credential_id AND bound.host_group_id = @credentialGroupId))
+        ({alias}.host_group_id = @credentialGroupId OR {alias}.credential_id = @credentialId)
         """;
 }

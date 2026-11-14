@@ -7,7 +7,7 @@ using Baton.Integration.Tests.Infrastructure;
 
 namespace Baton.Integration.Tests.Automations;
 
-/// <summary>AUT-04 webhooks: signature, encrypted secrets and delivery dedupe (M4 task 2.5, ADR-0015).</summary>
+/// <summary>AUT-04 webhooks: signature, replay window, encrypted secrets and delivery dedupe (M4 task 2.5, ADR-0015, harden-webhook-signatures).</summary>
 [Collection(PostgresCollectionDefinition.Name)]
 public sealed class WebhookTests(PostgresFixture pg) : IAsyncLifetime
 {
@@ -33,7 +33,7 @@ public sealed class WebhookTests(PostgresFixture pg) : IAsyncLifetime
     {
         var (automation, trigger, secret) = await CreateAsync();
 
-        var response = await SendAsync(trigger.Id, WebhookSignature.Compute(secret, Encoding.UTF8.GetBytes(Body)), "delivery-1");
+        var response = await SendAsync(trigger.Id, Sign(secret, "delivery-1"), "delivery-1");
 
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         var runId = (await response.Content.ReadFromJsonAsync<RunAccepted>())!.RunId;
@@ -43,7 +43,7 @@ public sealed class WebhookTests(PostgresFixture pg) : IAsyncLifetime
 
     [Theory]
     [InlineData(null)]
-    [InlineData("sha256=0000000000000000000000000000000000000000000000000000000000000000")]
+    [InlineData("t=1763100000,v1=0000000000000000000000000000000000000000000000000000000000000000")]
     [InlineData("not a signature")]
     public async Task Missing_or_wrong_signature_is_401_and_creates_no_run(string? signature)
     {
@@ -59,22 +59,57 @@ public sealed class WebhookTests(PostgresFixture pg) : IAsyncLifetime
     public async Task Signature_made_with_another_secret_or_for_an_unknown_trigger_is_401()
     {
         var (_, trigger, secret) = await CreateAsync();
-        var signature = WebhookSignature.Compute(secret, Encoding.UTF8.GetBytes(Body));
 
-        Assert.Equal(HttpStatusCode.Unauthorized,
-            (await SendAsync(trigger.Id, WebhookSignature.Compute("whsec_other", Encoding.UTF8.GetBytes(Body)), "d")).StatusCode);
-        Assert.Equal(HttpStatusCode.Unauthorized, (await SendAsync(Guid.CreateVersion7(), signature, "d")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await SendAsync(trigger.Id, Sign("whsec_other", "d"), "d")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await SendAsync(Guid.CreateVersion7(), Sign(secret, "d"), "d")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Old_body_only_signature_is_401()
+    {
+        var (automation, trigger, secret) = await CreateAsync();
+        var bodyOnly = "sha256=" + Convert.ToHexStringLower(
+            System.Security.Cryptography.HMACSHA256.HashData(Encoding.UTF8.GetBytes(secret), Encoding.UTF8.GetBytes(Body)));
+
+        var response = await SendAsync(trigger.Id, bodyOnly, "delivery-1");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal(0L, await RunCountAsync(automation.Id));
+    }
+
+    [Fact]
+    public async Task Stale_timestamp_is_401_and_creates_no_run()
+    {
+        var (automation, trigger, secret) = await CreateAsync();
+
+        var response = await SendAsync(trigger.Id, Sign(secret, "delivery-1", DateTimeOffset.UtcNow.AddMinutes(-6)), "delivery-1");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal(0L, await RunCountAsync(automation.Id));
+    }
+
+    [Fact]
+    public async Task Replay_with_another_delivery_id_is_401()
+    {
+        var (automation, trigger, secret) = await CreateAsync(policy: "allow");
+        var captured = Sign(secret, "delivery-1");
+        Assert.Equal(HttpStatusCode.Accepted, (await SendAsync(trigger.Id, captured, "delivery-1")).StatusCode);
+
+        var replay = await SendAsync(trigger.Id, captured, "delivery-2");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, replay.StatusCode);
+        Assert.Equal(1L, await RunCountAsync(automation.Id));
     }
 
     [Fact]
     public async Task Retried_delivery_returns_the_first_run_and_creates_no_second()
     {
         var (automation, trigger, secret) = await CreateAsync(policy: "allow");
-        var signature = WebhookSignature.Compute(secret, Encoding.UTF8.GetBytes(Body));
+        var signature = Sign(secret, "delivery-42");
 
         var first = await SendAsync(trigger.Id, signature, "delivery-42");
-        var retry = await SendAsync(trigger.Id, signature, "delivery-42");
-        var next = await SendAsync(trigger.Id, signature, "delivery-43");
+        var retry = await SendAsync(trigger.Id, signature, "delivery-42"); // a replay inside the window is a retry
+        var next = await SendAsync(trigger.Id, Sign(secret, "delivery-43"), "delivery-43");
 
         Assert.Equal(HttpStatusCode.Accepted, retry.StatusCode);
         Assert.Equal((await first.Content.ReadFromJsonAsync<RunAccepted>())!.RunId, (await retry.Content.ReadFromJsonAsync<RunAccepted>())!.RunId);
@@ -91,7 +126,8 @@ public sealed class WebhookTests(PostgresFixture pg) : IAsyncLifetime
         {
             Content = new StringContent(body, Encoding.UTF8, "application/json"),
         };
-        message.Headers.TryAddWithoutValidation(WebhookSignature.HeaderName, WebhookSignature.Compute(secret, Encoding.UTF8.GetBytes(body)));
+        message.Headers.TryAddWithoutValidation(WebhookSignature.HeaderName,
+            WebhookSignature.Compute(secret, DateTimeOffset.UtcNow.ToUnixTimeSeconds(), "big", Encoding.UTF8.GetBytes(body)));
         message.Headers.Add(WebhookEndpoints.DeliveryIdHeader, "big");
 
         var response = await _sender.SendAsync(message);
@@ -105,7 +141,7 @@ public sealed class WebhookTests(PostgresFixture pg) : IAsyncLifetime
     {
         var (automation, trigger, secret) = await CreateAsync();
 
-        var response = await SendAsync(trigger.Id, WebhookSignature.Compute(secret, Encoding.UTF8.GetBytes(Body)), null);
+        var response = await SendAsync(trigger.Id, Sign(secret, ""), null);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal(0L, await RunCountAsync(automation.Id));
@@ -135,9 +171,9 @@ public sealed class WebhookTests(PostgresFixture pg) : IAsyncLifetime
 
         Assert.NotEqual(oldSecret, newSecret);
         Assert.Equal(HttpStatusCode.Unauthorized,
-            (await SendAsync(trigger.Id, WebhookSignature.Compute(oldSecret, Encoding.UTF8.GetBytes(Body)), "d1")).StatusCode);
+            (await SendAsync(trigger.Id, Sign(oldSecret, "d1"), "d1")).StatusCode);
         Assert.Equal(HttpStatusCode.Accepted,
-            (await SendAsync(trigger.Id, WebhookSignature.Compute(newSecret, Encoding.UTF8.GetBytes(Body)), "d2")).StatusCode);
+            (await SendAsync(trigger.Id, Sign(newSecret, "d2"), "d2")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound,
             (await _api.Operator.PostAsync($"/api/automations/{Guid.CreateVersion7()}/triggers/{trigger.Id}/rotate-secret", null)).StatusCode);
     }
@@ -146,10 +182,9 @@ public sealed class WebhookTests(PostgresFixture pg) : IAsyncLifetime
     public async Task Delivery_under_skip_at_the_limit_is_acknowledged_as_skipped()
     {
         var (automation, trigger, secret) = await CreateAsync(policy: "skip");
-        var signature = WebhookSignature.Compute(secret, Encoding.UTF8.GetBytes(Body));
-        await SendAsync(trigger.Id, signature, "first");
+        await SendAsync(trigger.Id, Sign(secret, "first"), "first");
 
-        var response = await SendAsync(trigger.Id, signature, "second");
+        var response = await SendAsync(trigger.Id, Sign(secret, "second"), "second");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.True((await response.Content.ReadFromJsonAsync<WebhookSkipped>())!.Skipped);
@@ -162,7 +197,7 @@ public sealed class WebhookTests(PostgresFixture pg) : IAsyncLifetime
         var (automation, trigger, secret) = await CreateAsync();
         await _api.Operator.PostAsync($"/api/automations/{automation.Id}/disable", null);
 
-        var response = await SendAsync(trigger.Id, WebhookSignature.Compute(secret, Encoding.UTF8.GetBytes(Body)), "d");
+        var response = await SendAsync(trigger.Id, Sign(secret, "d"), "d");
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         Assert.Equal(0L, await RunCountAsync(automation.Id));
@@ -174,6 +209,10 @@ public sealed class WebhookTests(PostgresFixture pg) : IAsyncLifetime
         var trigger = automation.Triggers.Single();
         return (automation, trigger, trigger.WebhookSecret!);
     }
+
+    /// <summary>Signs <see cref="Body"/> for <paramref name="deliveryId"/> at <paramref name="at"/> (default: now).</summary>
+    private static string Sign(string secret, string deliveryId, DateTimeOffset? at = null) =>
+        WebhookSignature.Compute(secret, (at ?? DateTimeOffset.UtcNow).ToUnixTimeSeconds(), deliveryId, Encoding.UTF8.GetBytes(Body));
 
     private async Task<HttpResponseMessage> SendAsync(Guid triggerId, string? signature, string? deliveryId)
     {

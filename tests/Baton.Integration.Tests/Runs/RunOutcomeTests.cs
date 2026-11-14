@@ -104,7 +104,7 @@ public sealed class RunOutcomeTests(PostgresFixture pg)
         await s.AdmitAsync();
         Assert.Equal("pending", await s.RunStatusAsync(waiting));
 
-        var loop = new LimitReconcilerLoop(pg.DataSource, Options.Create(new DispatchOptions()), NullLogger<LimitReconcilerLoop>.Instance);
+        var loop = new LimitReconcilerLoop(pg.DataSource, Options.Create(new DispatchOptions()), TestMetrics.Create(), NullLogger<LimitReconcilerLoop>.Instance);
         Assert.True(await loop.RunOnceAsync(CancellationToken.None));
         await s.AdmitAsync();
 

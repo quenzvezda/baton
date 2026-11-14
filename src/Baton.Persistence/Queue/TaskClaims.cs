@@ -84,10 +84,12 @@ public sealed class TaskClaims(NpgsqlDataSource dataSource, DefinitionGraphCache
           AND status = 'succeeded' AND output IS NOT NULL
         """;
 
-    /// <param name="credentialGroupId">Group of the calling agent's credential (ADR-0013).</param>
+    /// <param name="credential">The calling agent's credential (ADR-0013).</param>
     /// <returns><c>null</c> when the credential may act for no such host.</returns>
-    public async Task<ClaimResult?> ClaimAsync(Guid credentialGroupId, Guid hostId, int freeSlots, CancellationToken ct)
+    public async Task<ClaimResult?> ClaimAsync(AgentCredential credential, Guid hostId, int freeSlots, CancellationToken ct)
     {
+        ArgumentNullException.ThrowIfNull(credential);
+
         await using var connection = await dataSource.OpenConnectionAsync(ct);
         await using var transaction = await connection.BeginTransactionAsync(ct);
 
@@ -97,7 +99,8 @@ public sealed class TaskClaims(NpgsqlDataSource dataSource, DefinitionGraphCache
         await using (var host = new NpgsqlCommand(HostRowSql, connection, transaction))
         {
             host.Parameters.AddWithValue("hostId", hostId);
-            host.Parameters.AddWithValue("credentialGroupId", credentialGroupId);
+            host.Parameters.AddWithValue("credentialGroupId", credential.HostGroupId);
+            host.Parameters.AddWithValue("credentialId", credential.Id);
             await using var reader = await host.ExecuteReaderAsync(ct);
             if (!await reader.ReadAsync(ct))
                 return null;

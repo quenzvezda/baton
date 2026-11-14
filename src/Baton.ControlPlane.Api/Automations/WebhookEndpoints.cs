@@ -10,10 +10,11 @@ namespace Baton.ControlPlane.Api.Automations;
 public sealed record WebhookSkipped(bool Skipped);
 
 /// <summary>
-/// Webhook intake (AUT-04, ORC-01, design.md decisions 2, 3, 7, 8). Anonymous: the HMAC-SHA256 signature of the
-/// raw body in <c>X-Signature</c> is the authentication, and an unknown trigger answers like a bad signature
-/// (401) so trigger ids cannot be probed. <c>X-Delivery-Id</c> identifies the delivery: a retry returns the run
-/// the first request created. The body itself is not used in M4.
+/// Webhook intake (AUT-04, ORC-01, design.md decisions 2, 3, 7, 8; harden-webhook-signatures). Anonymous: the
+/// HMAC-SHA256 signature in <c>X-Signature</c> over a timestamp, the delivery id and the raw body is the
+/// authentication, checked against Postgres <c>now()</c>; an unknown trigger, a bad signature and a stale
+/// timestamp all answer 401 so trigger ids cannot be probed. <c>X-Delivery-Id</c> identifies the delivery: a
+/// retry returns the run the first request created. The body itself is not used in M4.
 /// </summary>
 public static class WebhookEndpoints
 {
@@ -41,13 +42,14 @@ public static class WebhookEndpoints
                 (t, a) => new { t.AutomationId, t.WebhookSecret, TriggerEnabled = t.Enabled, AutomationEnabled = a.Enabled })
             .SingleOrDefaultAsync(ct);
         var secret = trigger?.WebhookSecret is { } stored ? secrets.Reveal(stored) : null;
+        var deliveryId = http.Headers[DeliveryIdHeader].ToString();
+        var now = await DatabaseNowAsync(db, ct);
         if (trigger is null || secret is null
-            || !WebhookSignature.Verify(secret, body, http.Headers[WebhookSignature.HeaderName]))
+            || !WebhookSignature.Verify(secret, body, deliveryId, http.Headers[WebhookSignature.HeaderName], now))
         {
             return TypedResults.Unauthorized();
         }
 
-        var deliveryId = http.Headers[DeliveryIdHeader].ToString();
         if (deliveryId.Length is 0 or > MaxDeliveryIdLength)
         {
             return TypedResults.ValidationProblem(new Dictionary<string, string[]>
@@ -89,6 +91,10 @@ public static class WebhookEndpoints
 
         return buffer.ToArray();
     }
+
+    /// <summary>The window is measured against Postgres time, never the API host's clock.</summary>
+    private static Task<DateTimeOffset> DatabaseNowAsync(BatonDbContext db, CancellationToken ct) =>
+        db.Database.SqlQuery<DateTimeOffset>($"SELECT now() AS \"Value\"").SingleAsync(ct);
 
     private static Conflict<ProblemDetails> Conflict(string title, string detail) =>
         TypedResults.Conflict(new ProblemDetails { Title = title, Detail = detail, Status = StatusCodes.Status409Conflict });

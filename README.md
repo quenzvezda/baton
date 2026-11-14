@@ -27,14 +27,15 @@ and fenced leases keep a stale worker from ever overwriting a newer result.
 ---
 
 > [!NOTE]
-> **Project status: M0–M5 done, phase 1 complete; Gate G1 next.** The design, the architecture
+> **Project status: M0–M5 done and Gate G1 passed; v1 is complete, phase 2 (M6, M7) next.** The design, the architecture
 > decisions and the specifications for every v1 milestone are complete. The schema, test harness and
 > CI are in place, and workflows written in C# are validated, versioned, registered and listed by the
 > catalog API. Agents register, heartbeat and drain with group-scoped credentials, and people sign
 > in with OIDC roles. Ready tasks are dispatched to eligible agents under fenced leases, and lost or
 > failed attempts are retried elsewhere. Automations fire on cron, Run now and signed webhooks; runs
 > are admitted under limits, time out and can be cancelled. A Blazor console lets people browse
-> workflows, edit automations, and follow runs, task graphs and logs live. See [Roadmap](#roadmap).
+> workflows, edit automations, and follow runs, task graphs and logs live. Load, chaos, security and
+> backup checks passed at proof-of-concept scale, with runbooks for operators. See [Roadmap](#roadmap).
 
 ## Why Baton?
 
@@ -233,7 +234,7 @@ mapped to a milestone.
 | **M3** | [Task dispatch & leases](docs/milestones/M3-task-dispatch.md) | Claims, fencing, reaper, retries | ✅ Done |
 | **M4** | [Automations & run lifecycle](docs/milestones/M4-automations-and-run-lifecycle.md) | Triggers, admission, limits, cancellation | ✅ Done |
 | **M5** | [Web console & monitoring](docs/milestones/M5-web-console-and-monitoring.md) | Catalog, runs, DAG view, live logs, hosts | ✅ Done |
-| **G1** | [v1 production readiness](docs/milestones/G1-v1-production-readiness.md) | Load, chaos and security gate | — |
+| **G1** | [v1 production readiness](docs/milestones/G1-v1-production-readiness.md) | Load, chaos and security gate | ✅ Done |
 | M6–M8 | [Phase 2 & 3](ROADMAP.md) | Aging, pinned runs, audit log, re-run from failure, OTel, extensibility | Planned |
 
 Full plan, dependency graph and gates: [ROADMAP.md](ROADMAP.md).
@@ -313,10 +314,11 @@ curl -H "Authorization: Bearer $JWT" -H "Content-Type: application/json" http://
 curl -X POST -H "Authorization: Bearer $JWT" http://localhost:5100/api/automations/<automation-id>/runs   # Run now
 curl -X POST -H "Authorization: Bearer $JWT" http://localhost:5100/api/runs/<run-id>/cancel
 
-# A webhook delivery: HMAC-SHA256 of the raw body with the trigger's secret, and a delivery id for retries
-body='{"event":"orders.closed"}'
-sig=$(printf '%s' "$body" | openssl dgst -sha256 -hmac "$SECRET" | sed 's/^.* //')
-curl -H "X-Signature: sha256=$sig" -H "X-Delivery-Id: $(uuidgen)" -d "$body" http://localhost:5100/api/webhooks/<trigger-id>
+# A webhook delivery: HMAC-SHA256 with the trigger's secret over "<unix time>.<delivery id>.<raw body>".
+# The timestamp must be within 5 minutes of the server's time; reuse the delivery id (and signature) on retries.
+body='{"event":"orders.closed"}'; ts=$(date +%s); id=$(uuidgen)
+sig=$(printf '%s.%s.%s' "$ts" "$id" "$body" | openssl dgst -sha256 -hmac "$SECRET" | sed 's/^.* //')
+curl -H "X-Signature: t=$ts,v1=$sig" -H "X-Delivery-Id: $id" -d "$body" http://localhost:5100/api/webhooks/<trigger-id>
 ```
 
 ### Use the console

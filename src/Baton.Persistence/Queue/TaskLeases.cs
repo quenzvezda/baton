@@ -106,32 +106,32 @@ public sealed class TaskLeases(NpgsqlDataSource dataSource, DefinitionGraphCache
 
     /// <summary>Leased → Running (ORC-08). A repeated Start of a running attempt is accepted again.</summary>
     /// <returns><c>false</c> when the lease is stale.</returns>
-    public async Task<bool> StartAsync(Guid credentialGroupId, Guid taskRunId, long leaseToken, CancellationToken ct)
+    public async Task<bool> StartAsync(AgentCredential credential, Guid taskRunId, long leaseToken, CancellationToken ct)
     {
         await using var connection = await dataSource.OpenConnectionAsync(ct);
         await using var transaction = await connection.BeginTransactionAsync(ct);
 
         await using (var start = new NpgsqlCommand(StartSql, connection, transaction))
         {
-            AddFence(start, credentialGroupId, taskRunId, leaseToken);
+            AddFence(start, credential, taskRunId, leaseToken);
             await start.ExecuteNonQueryAsync(ct);
         }
 
-        var current = await CurrentAttemptAsync(connection, transaction, credentialGroupId, taskRunId, leaseToken, ct);
+        var current = await CurrentAttemptAsync(connection, transaction, credential, taskRunId, leaseToken, ct);
         await transaction.CommitAsync(ct);
         return current is not null;
     }
 
     /// <returns>The number of lines stored, or <c>null</c> when the lease is stale and nothing was stored.</returns>
     public async Task<int?> AppendLogsAsync(
-        Guid credentialGroupId, Guid taskRunId, int attempt, long leaseToken, IReadOnlyList<TaskLogLine> lines, CancellationToken ct)
+        AgentCredential credential, Guid taskRunId, int attempt, long leaseToken, IReadOnlyList<TaskLogLine> lines, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(lines);
 
         await using var connection = await dataSource.OpenConnectionAsync(ct);
         await using var transaction = await connection.BeginTransactionAsync(ct);
 
-        if (await CurrentAttemptAsync(connection, transaction, credentialGroupId, taskRunId, leaseToken, ct) != attempt)
+        if (await CurrentAttemptAsync(connection, transaction, credential, taskRunId, leaseToken, ct) != attempt)
             return null;
 
         await using var insert = new NpgsqlCommand(AppendLogsSql, connection, transaction);
@@ -152,7 +152,7 @@ public sealed class TaskLeases(NpgsqlDataSource dataSource, DefinitionGraphCache
     /// the task without retry (WF-07).
     /// </summary>
     /// <returns><c>false</c> when the lease is stale; nothing was changed.</returns>
-    public async Task<bool> CompleteAsync(Guid credentialGroupId, AttemptReport report, CancellationToken ct)
+    public async Task<bool> CompleteAsync(AgentCredential credential, AttemptReport report, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(report);
 
@@ -169,7 +169,7 @@ public sealed class TaskLeases(NpgsqlDataSource dataSource, DefinitionGraphCache
         EndingAttempt attempt;
         await using (var lockTask = new NpgsqlCommand(LockTaskSql, connection, transaction))
         {
-            AddFence(lockTask, credentialGroupId, report.TaskRunId, report.LeaseToken);
+            AddFence(lockTask, credential, report.TaskRunId, report.LeaseToken);
             await using var reader = await lockTask.ExecuteReaderAsync(ct);
             if (!await reader.ReadAsync(ct))
                 return false;
@@ -195,18 +195,19 @@ public sealed class TaskLeases(NpgsqlDataSource dataSource, DefinitionGraphCache
     }
 
     private static async Task<int?> CurrentAttemptAsync(
-        NpgsqlConnection connection, NpgsqlTransaction transaction, Guid credentialGroupId, Guid taskRunId, long leaseToken,
+        NpgsqlConnection connection, NpgsqlTransaction transaction, AgentCredential credential, Guid taskRunId, long leaseToken,
         CancellationToken ct)
     {
         await using var cmd = new NpgsqlCommand(IsCurrentSql, connection, transaction);
-        AddFence(cmd, credentialGroupId, taskRunId, leaseToken);
+        AddFence(cmd, credential, taskRunId, leaseToken);
         return await cmd.ExecuteScalarAsync(ct) is int attempt ? attempt : null;
     }
 
-    private static void AddFence(NpgsqlCommand cmd, Guid credentialGroupId, Guid taskRunId, long leaseToken)
+    private static void AddFence(NpgsqlCommand cmd, AgentCredential credential, Guid taskRunId, long leaseToken)
     {
         cmd.Parameters.AddWithValue("id", taskRunId);
         cmd.Parameters.AddWithValue("token", leaseToken);
-        cmd.Parameters.AddWithValue("credentialGroupId", credentialGroupId);
+        cmd.Parameters.AddWithValue("credentialGroupId", credential.HostGroupId);
+        cmd.Parameters.AddWithValue("credentialId", credential.Id);
     }
 }
