@@ -39,6 +39,9 @@ public interface IBatonApi
 
     Task DeleteAutomationAsync(Guid id, int version, CancellationToken ct = default);
 
+    /// <summary>OBS-05: issues a new signing secret for a webhook notification channel; the secret is returned once.</summary>
+    Task<SigningSecretRotated> RotateNotificationSecretAsync(Guid automationId, Guid channelId, CancellationToken ct = default);
+
     Task<RunAccepted> RunNowAsync(Guid automationId, CancellationToken ct = default);
 
     Task<RunPage> ListRunsAsync(RunQuery query, CancellationToken ct = default);
@@ -46,6 +49,16 @@ public interface IBatonApi
     Task<RunDetail?> GetRunAsync(Guid id, CancellationToken ct = default);
 
     Task<CancelAccepted> CancelRunAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>WF-10: re-runs a Failed or TimedOut run in place; returns the run, now Pending. Other states fail with 409.</summary>
+    Task<RunDetail> RetryFailedRunAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>OBS-04: every host group's queue, ordered by name.</summary>
+    Task<IReadOnlyList<QueueGroupStats>> GetQueueStatsAsync(CancellationToken ct = default);
+
+    /// <summary>AUT-11: the audit entries of one entity, newest first.</summary>
+    /// <param name="entityType"><c>automation</c>, <c>host_group</c>, <c>agent_credential</c> or <c>workflow_limit</c>.</param>
+    Task<AuditPage> GetAuditAsync(string entityType, string entityId, string? cursor = null, int? limit = null, CancellationToken ct = default);
 
     /// <param name="attempt"><c>null</c> for the task's latest attempt.</param>
     Task<LogPage?> GetLogsAsync(Guid runId, string taskKey, int? attempt, int afterSeq = 0, CancellationToken ct = default);

@@ -1,0 +1,110 @@
+@inject IBatonApi Api
+
+@* AUT-11: one entity's audit entries, newest first, each with who, when, what kind of change and the fields it changed. *@
+<ErrorMessage Text="@_error" />
+@if (_entries is null)
+{
+    <p class="muted">Loading…</p>
+}
+else if (_entries.Count == 0)
+{
+    <p class="muted">No change has been recorded.</p>
+}
+else
+{
+    <ol class="history">
+        @foreach (var entry in _entries)
+        {
+            var changes = AuditChanges.Between(entry.Before, entry.After);
+            var webhookUrls = AuditChanges.ChangedWebhookUrls(entry.After);
+            <li data-entry="@entry.Id" data-action="@entry.Action">
+                <div class="history-head">
+                    <span class="badge history-action">@Describe(entry.Action)</span>
+                    <span class="history-actor" title="@entry.Actor.Subject">@entry.Actor.Name</span>
+                    <Moment Value="entry.At" />
+                </div>
+                @if (changes.Count > 0 || webhookUrls.Count > 0)
+                {
+                    <ul class="changes">
+                        @foreach (var change in changes)
+                        {
+                            <li data-field="@change.Field"><code>@change.Field</code>: <span class="before">@change.Before</span> → <span class="after">@change.After</span></li>
+                        }
+                        @foreach (var channelId in webhookUrls)
+                        {
+                            <li data-field="webhookUrl">webhook URL of channel <code>@Short(channelId)</code> changed</li>
+                        }
+                    </ul>
+                }
+                else if (entry.Before is null && entry.After is { ValueKind: not JsonValueKind.Null } created)
+                {
+                    <details><summary>@(entry.Action == "create" ? "Created as" : "Details")</summary><JsonBlock Value="created" /></details>
+                }
+                else if (entry.After is null && entry.Before is { ValueKind: not JsonValueKind.Null } deleted)
+                {
+                    <details><summary>@(entry.Action == "delete" ? "Deleted; it was" : "Details")</summary><JsonBlock Value="deleted" /></details>
+                }
+                else if (entry.Before is not null && entry.After is not null)
+                {
+                    <span class="muted">No field changed.</span>
+                }
+            </li>
+        }
+    </ol>
+    @if (_cursor is not null)
+    {
+        <button type="button" disabled="@_loading" @onclick="MoreAsync">Load more</button>
+    }
+}
+
+@code {
+    private List<AuditEntry>? _entries;
+    private string? _cursor;
+    private bool _loading;
+    private string? _error;
+    private (string, string)? _shown;
+
+    /// <summary><c>automation</c> or <c>host_group</c> (or any entity type the audit API knows).</summary>
+    [Parameter, EditorRequired] public string EntityType { get; set; } = "";
+
+    [Parameter, EditorRequired] public string EntityId { get; set; } = "";
+
+    /// <summary>Entries per page; the API's default when <c>null</c>.</summary>
+    [Parameter] public int? PageSize { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_shown == (EntityType, EntityId))
+            return;
+        _shown = (EntityType, EntityId);
+        _entries = null;
+        await LoadAsync(append: false);
+    }
+
+    private Task MoreAsync() => LoadAsync(append: true);
+
+    private async Task LoadAsync(bool append)
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var page = await Api.GetAuditAsync(EntityType, EntityId, append ? _cursor : null, PageSize);
+            _entries = append && _entries is not null ? [.. _entries, .. page.Items] : [.. page.Items];
+            _cursor = page.NextCursor;
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+            _entries ??= [];
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static string Describe(string action) => action.Replace('_', ' ');
+
+    private static string Short(string id) => id.Length > 8 ? id[..8] : id;
+}

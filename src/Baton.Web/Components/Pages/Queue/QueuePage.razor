@@ -1,0 +1,140 @@
+@page "/queue"
+@using System.Globalization
+@implements IAsyncDisposable
+@inject IBatonApi Api
+
+<PageTitle>Queue · Baton</PageTitle>
+
+<div class="page-head">
+    <h1>Queue</h1>
+    <span class="muted">Refreshes every @Every(RefreshInterval)@if (_refreshedAt is { } at) { <text> · updated <Moment Value="at" /></text> }</span>
+</div>
+<ErrorMessage Text="@_error" />
+@if (_groups is null)
+{
+    <p class="muted">Loading…</p>
+}
+else if (_groups.Count == 0)
+{
+    <p class="muted">No host group exists yet.</p>
+}
+else
+{
+    <table class="grid" data-queue>
+        <thead>
+            <tr><th>Group</th><th>Queued tasks</th><th>Oldest wait</th><th>Pending runs</th><th>Active leases</th>
+                <th>Lease expirations (1 h)</th><th><span class="visually-hidden">Links</span></th></tr>
+        </thead>
+        <tbody>
+            @foreach (var group in _groups)
+            {
+                <tr data-group="@group.HostGroupId">
+                    <td>@group.Name @if (group.Paused) { <StatusBadge Status="paused" /> }</td>
+                    <td data-queued>@group.Queued</td>
+                    <td data-oldest-wait>@Wait(group.OldestWaitSeconds)</td>
+                    <td data-pending-runs>@group.PendingRuns</td>
+                    <td data-active-leases>@group.ActiveLeases</td>
+                    <td data-lease-expirations>@group.LeaseExpirationsLastHour</td>
+                    <td class="actions">
+                        <a href="@($"runs?hostGroupId={group.HostGroupId}")">Runs</a>
+                        <a href="@($"host-groups/{group.HostGroupId}/history")">History</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private readonly CancellationTokenSource _stop = new();
+    private IReadOnlyList<QueueGroupStats>? _groups;
+    private DateTimeOffset? _refreshedAt;
+    private string? _error;
+    private PeriodicTimer? _timer;
+    private Task? _refreshing;
+
+    /// <summary>OBS-04 asks for at most 10 s; decision 25 sets 5 s.</summary>
+    [Parameter] public TimeSpan RefreshInterval { get; set; } = TimeSpan.FromSeconds(5);
+
+    protected override Task OnInitializedAsync() => LoadAsync(_stop.Token);
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        // Not while prerendering: the timer lives as long as the interactive component.
+        if (!firstRender)
+            return;
+        _timer = new PeriodicTimer(RefreshInterval);
+        _refreshing = RefreshLoopAsync(_timer, _stop.Token);
+    }
+
+    private async Task RefreshLoopAsync(PeriodicTimer timer, CancellationToken ct)
+    {
+        try
+        {
+            while (await timer.WaitForNextTickAsync(ct))
+            {
+                await InvokeAsync(async () =>
+                {
+                    await LoadAsync(ct);
+                    if (!ct.IsCancellationRequested)
+                        StateHasChanged();
+                });
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Disposed.
+        }
+    }
+
+    private async Task LoadAsync(CancellationToken ct)
+    {
+        try
+        {
+            _groups = await Api.GetQueueStatsAsync(ct);
+            _refreshedAt = DateTimeOffset.UtcNow;
+            _error = null;
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        catch (HttpRequestException)
+        {
+            _error = "The API could not be reached; showing the last numbers.";
+        }
+        catch (TaskCanceledException) when (!ct.IsCancellationRequested)
+        {
+            _error = "The API did not answer in time; showing the last numbers.";
+        }
+    }
+
+    /// <summary>The oldest queued task's wait, in the largest unit that fits ("7 min", "2 h 5 min").</summary>
+    internal static string Wait(double? seconds)
+    {
+        if (seconds is not { } s)
+            return "—";
+        var wait = TimeSpan.FromSeconds(Math.Max(0, s));
+        return wait switch
+        {
+            { TotalMinutes: < 1 } => $"{(int)wait.TotalSeconds} s",
+            { TotalHours: < 1 } => $"{(int)wait.TotalMinutes} min",
+            { TotalDays: < 1 } => wait.Minutes == 0 ? $"{(int)wait.TotalHours} h" : $"{(int)wait.TotalHours} h {wait.Minutes} min",
+            _ => wait.Hours == 0 ? $"{(int)wait.TotalDays} d" : $"{(int)wait.TotalDays} d {wait.Hours} h",
+        };
+    }
+
+    private static string Every(TimeSpan interval) =>
+        interval.TotalSeconds >= 1
+            ? $"{interval.TotalSeconds.ToString("0.#", CultureInfo.InvariantCulture)} s"
+            : $"{interval.TotalMilliseconds.ToString("0", CultureInfo.InvariantCulture)} ms";
+
+    public async ValueTask DisposeAsync()
+    {
+        await _stop.CancelAsync();
+        _timer?.Dispose();
+        if (_refreshing is not null)
+            await _refreshing;
+        _stop.Dispose();
+    }
+}

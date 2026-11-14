@@ -80,6 +80,12 @@ public sealed class BatonApiClient(HttpClient http, AccessTokenProvider tokens) 
         await EnsureSuccessAsync(response, ct);
     }
 
+    public async Task<SigningSecretRotated> RotateNotificationSecretAsync(Guid automationId, Guid channelId, CancellationToken ct = default)
+    {
+        using var message = new HttpRequestMessage(HttpMethod.Post, $"api/automations/{automationId}/notifications/{channelId}/rotate-secret");
+        return await ReadAsync<SigningSecretRotated>(await SendAsync(message, ct), ct);
+    }
+
     public async Task<RunAccepted> RunNowAsync(Guid automationId, CancellationToken ct = default)
     {
         using var message = new HttpRequestMessage(HttpMethod.Post, $"api/automations/{automationId}/runs");
@@ -115,6 +121,26 @@ public sealed class BatonApiClient(HttpClient http, AccessTokenProvider tokens) 
     {
         using var message = new HttpRequestMessage(HttpMethod.Post, $"api/runs/{id}/cancel");
         return await ReadAsync<CancelAccepted>(await SendAsync(message, ct), ct);
+    }
+
+    public async Task<RunDetail> RetryFailedRunAsync(Guid id, CancellationToken ct = default)
+    {
+        using var message = new HttpRequestMessage(HttpMethod.Post, $"api/runs/{id}/retry-failed");
+        return await ReadAsync<RunDetail>(await SendAsync(message, ct), ct);
+    }
+
+    public Task<IReadOnlyList<QueueGroupStats>> GetQueueStatsAsync(CancellationToken ct = default) =>
+        GetAsync<IReadOnlyList<QueueGroupStats>>("api/queue/stats", ct);
+
+    public Task<AuditPage> GetAuditAsync(string entityType, string entityId, string? cursor = null, int? limit = null, CancellationToken ct = default)
+    {
+        var path = new StringBuilder("api/audit?entityType=").Append(Uri.EscapeDataString(entityType))
+            .Append("&entityId=").Append(Uri.EscapeDataString(entityId));
+        if (!string.IsNullOrEmpty(cursor))
+            path.Append("&cursor=").Append(Uri.EscapeDataString(cursor));
+        if (limit is { } l)
+            path.Append("&limit=").Append(l.ToString(CultureInfo.InvariantCulture));
+        return GetAsync<AuditPage>(path.ToString(), ct);
     }
 
     public Task<LogPage?> GetLogsAsync(Guid runId, string taskKey, int? attempt, int afterSeq = 0, CancellationToken ct = default)

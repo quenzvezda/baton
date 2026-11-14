@@ -1,0 +1,34 @@
+@page "/automations/{Id:guid}/history"
+@inject IBatonApi Api
+
+<PageTitle>History · @(_name ?? "Automation") · Baton</PageTitle>
+
+<p class="crumbs"><a href="automations">Automations</a> / @if (_found) { <a href="@($"automations/{Id}")">@_name</a> <text>/</text> }</p>
+<h1>History of @(_name ?? $"automation {Id.ToString()[..8]}")</h1>
+<ErrorMessage Text="@_error" />
+<AuditHistory EntityType="automation" EntityId="@Id.ToString()" PageSize="PageSize" />
+
+@code {
+    private string? _name;
+    private bool _found;
+    private string? _error;
+
+    [Parameter] public Guid Id { get; set; }
+
+    /// <summary>Entries per page; the API's default when <c>null</c>.</summary>
+    [Parameter] public int? PageSize { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            // A deleted automation keeps its history; it is then shown by id.
+            var automation = await Api.GetAutomationAsync(Id);
+            (_name, _found) = (automation?.Name, automation is not null);
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+    }
+}
