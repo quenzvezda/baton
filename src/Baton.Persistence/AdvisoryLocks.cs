@@ -17,6 +17,9 @@ public static class AdvisoryLocks
     /// <summary>Singleton <c>LimitReconcilerLoop</c> (M3 design.md decision 8).</summary>
     public const long LimitReconciler = Prefix + 2;
 
+    /// <summary>Singleton <c>AgingLoop</c> (ORC-06, M6 design.md decision 9).</summary>
+    public const long Aging = Prefix + 3;
+
     /// <summary>Keys with the low word's top bit set belong to per-group admission; the constants above stay below it.</summary>
     private const long AdmissionSpace = Prefix + 0x8000_0000;
 

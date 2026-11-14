@@ -81,6 +81,7 @@ internal sealed class TaskFinisher(DefinitionGraphCache graphs)
           upstream_unsuccessful = u.unsuccessful,
           status                = COALESCE(u.status, t.status),
           queued_at             = CASE WHEN u.status = 'queued' THEN now() ELSE t.queued_at END,
+          effective_priority    = CASE WHEN u.status = 'queued' THEN t.priority ELSE t.effective_priority END,
           finished_at           = CASE WHEN u.status = 'skipped' THEN now() ELSE t.finished_at END
         FROM unnest(@keys::text[], @remaining::int[], @failed::int[], @unsuccessful::int[], @statuses::text[])
              AS u(key, remaining, failed, unsuccessful, status)

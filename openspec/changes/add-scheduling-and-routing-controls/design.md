@@ -43,8 +43,8 @@ never waits on a lock it can skip; aging writes only rows whose value changes.
    in time order. N is per trigger, 1–10, default 3. FireOnce is CatchUp with N = 1 and Skip is N = 0, so
    FireOnce now fires the most recent missed time instead of the oldest (an intended change: the run gets
    the fire time closest to the data it should process).
-3. **Aging step and cap are global orchestrator settings** (`Baton:Aging:Step`, default `00:05:00`;
-   `Baton:Aging:Cap`, default 20), not per group. No schema, API or UI for them.
+3. **Aging step and cap are global orchestrator settings** (`Dispatch:AgingStep`, default `00:05:00`;
+   `Dispatch:AgingCap`, default 20; next to the other dispatch timings), not per group. No schema, API or UI for them.
 4. **Pause stops claims only.** Admission continues, so runs of a paused group become Running and their
    tasks queue. Run deadlines keep counting while a group is paused. Operators may pause and resume (the
    access-control spec already lists "pause" under Operator).

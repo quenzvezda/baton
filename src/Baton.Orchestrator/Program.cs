@@ -21,7 +21,7 @@ builder.Services.AddAgentProtocol(builder.Configuration);
 //   M3: ReaperLoop (5 s, SKIP LOCKED; M4 adds cancel grace and run deadlines), RetryPromoterLoop (1 s, SKIP LOCKED),
 //       LimitReconcilerLoop (5 min, singleton), TasksReadyListener (LISTEN for claims)
 //   M4: TriggerLoop (1 s, SKIP LOCKED), AdmissionLoop (1 s, advisory lock per group)
-//   M6: AgingLoop (30 s, singleton)
+//   M6: AgingLoop (30 s, singleton; registered with the dispatch loops)
 builder.Services.AddOrchestratorMetrics();
 builder.Services.AddHostedService<PartitionMaintenanceLoop>();
 builder.Services.AddDispatchLoops();
