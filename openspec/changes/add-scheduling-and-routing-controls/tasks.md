@@ -40,7 +40,7 @@
 
 ## 7. Close
 
-- [ ] 7.1 `dotnet build Baton.slnx -c Release` clean; `dotnet test` green for Domain, Agent, Web and Integration; `npx @fission-ai/openspec@1.14.1 validate --all --strict` green
+- [x] 7.1 `dotnet build Baton.slnx -c Release` clean; `dotnet test` green for Domain, Agent, Web and Integration; `npx @fission-ai/openspec@1.14.1 validate --all --strict` green
 
 ## Workflow follow-up
 
