@@ -27,7 +27,7 @@ and fenced leases keep a stale worker from ever overwriting a newer result.
 ---
 
 > [!NOTE]
-> **Project status: v1 complete (M0–M5, Gate G1); phase 2 under way: M6 done, M7 next.** The design, the architecture
+> **Project status: v1 complete (M0–M5, Gate G1); phase 2 under way: M6 done, M7 in progress.** The design, the architecture
 > decisions and the specifications for every v1 milestone are complete. The schema, test harness and
 > CI are in place, and workflows written in C# are validated, versioned, registered and listed by the
 > catalog API. Agents register, heartbeat and drain with group-scoped credentials, and people sign
@@ -64,6 +64,7 @@ coordinated through PostgreSQL alone.**
 | 🔒 **Leases with fencing** | Every claim carries a monotonic fencing token. A stale worker's result is rejected with `FAILED_PRECONDITION`, so no task runs twice at the same time. |
 | 🔁 **Retries & cancellation** | Exponential backoff with jitter, `NonRetryableException` for fail-fast errors, task and run timeouts, and cooperative cancellation with a grace period. |
 | 🐘 **PostgreSQL only** | Config, run state, the task queue, leases and wake-ups (`LISTEN/NOTIFY`) live in one database. Every state transition is one transaction. |
+| 🔭 **Operability** | Every configuration change is audited (who, when, before, after). Failed runs re-run in place from their failed tasks, keeping successful outputs. Failure and timeout notifications by email or signed webhook, a queue dashboard, and OpenTelemetry traces, metrics and logs from every process, with one trace per run. |
 | 📈 **Scales out** | API and orchestrator run as N replicas, with singleton loops elected through advisory locks. Agents self-register and pull work over outbound-only gRPC. |
 
 ## Architecture
@@ -238,7 +239,8 @@ mapped to a milestone.
 | **M5** | [Web console & monitoring](docs/milestones/M5-web-console-and-monitoring.md) | Catalog, runs, DAG view, live logs, hosts | ✅ Done |
 | **G1** | [v1 production readiness](docs/milestones/G1-v1-production-readiness.md) | Load, chaos and security gate | ✅ Done |
 | **M6** | [Scheduling & routing controls](docs/milestones/M6-scheduling-and-routing.md) | Misfire policy, fire-time preview, aging, pinned runs, group pause | ✅ Done |
-| M7–M8 | [Phase 2 & 3](ROADMAP.md) | Audit log, re-run from failure, queue dashboard, notifications, OTel, extensibility | Planned |
+| **M7** | [Operability & insight](docs/milestones/M7-operability-and-insight.md) | Audit log, re-run from failure, queue dashboard, notifications, OpenTelemetry everywhere | 🚧 In progress |
+| M8 | [Extensibility](docs/milestones/M8-extensibility.md) | Run-now overrides, resource pools, definitions in the UI, event triggers | Planned |
 
 Full plan, dependency graph and gates: [ROADMAP.md](ROADMAP.md).
 
@@ -316,6 +318,9 @@ curl -H "Authorization: Bearer $JWT" -H "Content-Type: application/json" http://
           "triggers":[{"kind":"cron","cronExpression":"0 * * * *","timeZone":"UTC"},{"kind":"webhook"}]}'
 curl -X POST -H "Authorization: Bearer $JWT" http://localhost:5100/api/automations/<automation-id>/runs   # Run now
 curl -X POST -H "Authorization: Bearer $JWT" http://localhost:5100/api/runs/<run-id>/cancel
+curl -X POST -H "Authorization: Bearer $JWT" http://localhost:5100/api/runs/<run-id>/retry-failed   # re-run a failed run in place
+curl -H "Authorization: Bearer $JWT" http://localhost:5100/api/queue/stats                         # queue per host group
+curl -H "Authorization: Bearer $JWT" "http://localhost:5100/api/audit?entityType=automation&entityId=<automation-id>"
 
 # A webhook delivery: HMAC-SHA256 with the trigger's secret over "<unix time>.<delivery id>.<raw body>".
 # The timestamp must be within 5 minutes of the server's time; reuse the delivery id (and signature) on retries.
@@ -323,6 +328,13 @@ body='{"event":"orders.closed"}'; ts=$(date +%s); id=$(uuidgen)
 sig=$(printf '%s.%s.%s' "$ts" "$id" "$body" | openssl dgst -sha256 -hmac "$SECRET" | sed 's/^.* //')
 curl -H "X-Signature: t=$ts,v1=$sig" -H "X-Delivery-Id: $id" -d "$body" http://localhost:5100/api/webhooks/<trigger-id>
 ```
+
+To hear about failures, add `"notifications"` to the automation: `[{"kind":"email","on":["failed","timed_out"],
+"recipients":["ops@example.com"]}]` or `[{"kind":"webhook","on":["failed"],"url":"https://hooks.example.com/..."}]`.
+A webhook channel's signing secret is shown once, in the response that created it. Its deliveries are signed
+like inbound webhooks (`X-Signature`, `X-Delivery-Id: ntf_<n>`). Locally, `docker compose up -d` also
+starts Mailpit, and the mail lands at http://localhost:8025. Settings and troubleshooting:
+[runbooks/notifications](docs/runbooks/notifications.md).
 
 ### Use the console
 

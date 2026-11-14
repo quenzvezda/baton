@@ -247,7 +247,10 @@ public static class AutomationEndpoints
         }
 
         db.AutomationTriggers.RemoveRange(existing.Where(t => !kept.Contains(t.Id)));
-        var changedUrls = NotificationChannels.Apply(db, id, request.Notifications ?? [], existingChannels, notificationSecrets, issued);
+        // Absent notifications keep the channels, so clients older than M7 do not drop them on save; [] removes them all.
+        var changedUrls = request.Notifications is { } notifications
+            ? NotificationChannels.Apply(db, id, notifications, existingChannels, notificationSecrets, issued)
+            : [];
 
         try
         {

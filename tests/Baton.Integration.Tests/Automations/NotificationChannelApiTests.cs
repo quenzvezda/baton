@@ -121,6 +121,30 @@ public sealed class NotificationChannelApiTests(PostgresFixture pg)
     }
 
     [Fact]
+    public async Task Update_without_notifications_keeps_the_channels_and_empty_list_removes_them()
+    {
+        await using var api = await AutomationApi.StartAsync(pg);
+        var (created, etag) = await api.CreateAsync(api.Request() with
+        {
+            Notifications = [new NotificationRequest(null, "email", ["failed"], ["ops@example.com"])],
+        });
+
+        using (var keep = new HttpRequestMessage(HttpMethod.Put, $"/api/automations/{created.Id}")
+               { Content = JsonContent.Create(api.Request(created.Name) with { Priority = 70 }) })
+        {
+            keep.Headers.IfMatch.Add(new EntityTagHeaderValue(etag));
+            var kept = await api.Operator.SendAsync(keep);
+            Assert.Equal(HttpStatusCode.OK, kept.StatusCode);
+            Assert.Single((await kept.Content.ReadFromJsonAsync<AutomationResponse>())!.Notifications);
+            etag = kept.Headers.ETag!.Tag;
+        }
+
+        var removed = await PutAsync(api, created, etag, []);
+
+        Assert.Empty((await removed.Content.ReadFromJsonAsync<AutomationResponse>())!.Notifications);
+    }
+
+    [Fact]
     public async Task Clone_drops_webhook_channels()
     {
         await using var api = await AutomationApi.StartAsync(pg);

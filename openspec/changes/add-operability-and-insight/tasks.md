@@ -48,14 +48,14 @@
 
 ## 7. Console
 
-- [ ] 7.1 Queue page `/queue` with 5 s refresh (decision 25); verify bUnit tests `Queue_page_lists_groups_with_backlog` and `Queue_page_refreshes_without_reload`
-- [ ] 7.2 Re-run failed tasks on the run detail page, re-run count shown, role-aware; verify bUnit tests `Operator_reruns_a_failed_run`, `Succeeded_run_offers_no_rerun`, `Viewer_sees_no_rerun_action`
-- [ ] 7.3 Notifications section in the automation editor, write-only URL, secret shown once; verify bUnit tests `Webhook_channel_secret_is_shown_once_after_save`, `Reopened_channel_shows_only_the_host`, `Channel_error_is_shown_next_to_the_channel`
-- [ ] 7.4 History view for automations and host groups with a before/after field diff; verify bUnit tests `Automation_history_shows_changed_fields` and `Group_history_shows_the_pause`
+- [x] 7.1 Queue page `/queue` with 5 s refresh (decision 25); verify bUnit tests `Queue_page_lists_groups_with_backlog` and `Queue_page_refreshes_without_reload`
+- [x] 7.2 Re-run failed tasks on the run detail page, re-run count shown, role-aware; verify bUnit tests `Operator_reruns_a_failed_run`, `Succeeded_run_offers_no_rerun`, `Viewer_sees_no_rerun_action`
+- [x] 7.3 Notifications section in the automation editor, write-only URL, secret shown once; verify bUnit tests `Webhook_channel_secret_is_shown_once_after_save`, `Reopened_channel_shows_only_the_host`, `Channel_error_is_shown_next_to_the_channel`
+- [x] 7.4 History view for automations and host groups with a before/after field diff; verify bUnit tests `Automation_history_shows_changed_fields` and `Group_history_shows_the_pause`
 
 ## 8. Close
 
-- [ ] 8.1 `dotnet build Baton.slnx -c Release` clean; `dotnet test` green for Domain, Agent, Web and Integration; `npx @fission-ai/openspec@1.14.1 validate --all --strict` green
+- [x] 8.1 `dotnet build Baton.slnx -c Release` clean; `dotnet test` green for Domain, Agent, Web and Integration; `npx @fission-ai/openspec@1.14.1 validate --all --strict` green
 
 ## Workflow follow-up
 

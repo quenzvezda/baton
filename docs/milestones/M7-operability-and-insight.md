@@ -23,5 +23,5 @@ ADR-0018 (notification outbox), ADR-0019 (email with MailKit), OQ-08 (should a f
 ## Exit criteria
 
 - [ ] Change created, validated, implemented and archived
-- [ ] Re-run reuses outputs and records the new attempts on the same run (decided: same run, change design.md decision 1)
+- [x] Re-run reuses outputs and records the new attempts on the same run (decided: same run, change design.md decision 1; tests `Rerun_queues_the_failed_task_with_kept_upstream_outputs`, `Rerun_attempts_continue_with_a_fresh_budget`)
 - [x] OQ-08 answered: a failed notification is reported, it never fails the run (change design.md decision 6, 2026-11-14)

@@ -233,7 +233,9 @@ Today's state, from the code:
     API:
     - `AutomationRequest`/`AutomationResponse` gain `notifications: [{ id?, kind, on: ["failed","timed_out"],
       recipients?, url? }]`.
-    - Channels are matched by `id` on update. An omitted `url` keeps the stored one. A new webhook channel
+    - Channels are matched by `id` on update, and channels left out of the list are removed. An absent
+      `notifications` field keeps every channel (clients older than M7 do not drop them), `[]` removes them all.
+      An omitted `url` keeps the stored one. A new webhook channel
       returns `signingSecret` once.
     - `POST /api/automations/{id}/notifications/{channelId}/rotate-secret` (Operator) mirrors the trigger
       endpoint.
