@@ -9,8 +9,10 @@ namespace Baton.Persistence.Queue;
 /// <param name="CancelledAfterGrace">Attempts whose cancellation was requested <see cref="LeaseReaper.CancelGrace"/> ago (ORC-11).</param>
 /// <param name="RunsTimedOut">Runs past their deadline whose cancellation began (AUT-09).</param>
 /// <param name="RunsPinnedHostLost">PinnedRun runs whose host went Offline or left the group; they end Failed (ORC-12).</param>
+/// <param name="LostByGroup">The <paramref name="Lost"/> attempts per host group, for the lease-expiration metric (OBS-04).</param>
 public readonly record struct ReapSummary(
-    int Lost, int TimedOut, int HostsMarkedOffline, int CancelledAfterGrace = 0, int RunsTimedOut = 0, int RunsPinnedHostLost = 0);
+    int Lost, int TimedOut, int HostsMarkedOffline, int CancelledAfterGrace = 0, int RunsTimedOut = 0, int RunsPinnedHostLost = 0,
+    IReadOnlyDictionary<Guid, int>? LostByGroup = null);
 
 /// <summary>
 /// The reaper's SQL (ORC-09, WF-05; design spec §7 "Expired leases"). Candidates are read without locks;
@@ -104,17 +106,21 @@ public sealed class LeaseReaper(NpgsqlDataSource dataSource, DefinitionGraphCach
     public async Task<ReapSummary> ReapAsync(CancellationToken ct)
     {
         var lost = 0;
+        var lostByGroup = new Dictionary<Guid, int>();
         foreach (var id in await CandidatesAsync(ExpiredSql, ct))
         {
-            if (await CloseAsync(id, LockExpiredSql, AttemptOutcome.Lost, null, ct))
+            if (await CloseAsync(id, LockExpiredSql, AttemptOutcome.Lost, null, ct) is { } group)
+            {
                 lost++;
+                lostByGroup[group] = lostByGroup.GetValueOrDefault(group) + 1;
+            }
         }
 
         var timedOut = 0;
         var error = TaskErrors.Json("Timeout", $"The attempt ran past its timeout plus {TimeoutGrace.TotalSeconds:0} s; closed by the platform.");
         foreach (var id in await CandidatesAsync(OverdueSql, ct))
         {
-            if (await CloseAsync(id, LockOverdueSql, AttemptOutcome.TimedOut, error, ct))
+            if (await CloseAsync(id, LockOverdueSql, AttemptOutcome.TimedOut, error, ct) is not null)
                 timedOut++;
         }
 
@@ -123,7 +129,7 @@ public sealed class LeaseReaper(NpgsqlDataSource dataSource, DefinitionGraphCach
             $"The handler did not stop within {CancelGrace.TotalSeconds:0} s of the cancellation; closed by the platform.");
         foreach (var id in await CandidatesAsync(CancelGraceSql, ct))
         {
-            if (await CloseAsync(id, LockCancelGraceSql, AttemptOutcome.Cancelled, graceError, ct))
+            if (await CloseAsync(id, LockCancelGraceSql, AttemptOutcome.Cancelled, graceError, ct) is not null)
                 cancelled++;
         }
 
@@ -143,7 +149,7 @@ public sealed class LeaseReaper(NpgsqlDataSource dataSource, DefinitionGraphCach
 
         await using var offline = dataSource.CreateCommand(OfflineSql);
         var hosts = await offline.ExecuteNonQueryAsync(ct);
-        return new ReapSummary(lost, timedOut, hosts, cancelled, runsTimedOut, pinnedHostLost);
+        return new ReapSummary(lost, timedOut, hosts, cancelled, runsTimedOut, pinnedHostLost, lostByGroup);
     }
 
     private Task<bool> TimeOutRunAsync(Guid runId, CancellationToken ct) =>
@@ -180,7 +186,8 @@ public sealed class LeaseReaper(NpgsqlDataSource dataSource, DefinitionGraphCach
         return ids;
     }
 
-    private async Task<bool> CloseAsync(Guid id, string lockSql, AttemptOutcome outcome, string? error, CancellationToken ct)
+    /// <returns>The task's host group when this call closed the attempt; <c>null</c> when it no longer qualified.</returns>
+    private async Task<Guid?> CloseAsync(Guid id, string lockSql, AttemptOutcome outcome, string? error, CancellationToken ct)
     {
         await using var connection = await dataSource.OpenConnectionAsync(ct);
         await using var transaction = await connection.BeginTransactionAsync(ct);
@@ -199,7 +206,7 @@ public sealed class LeaseReaper(NpgsqlDataSource dataSource, DefinitionGraphCach
             lockTask.Parameters.AddWithValue("cancelGrace", CancelGrace);
             await using var reader = await lockTask.ExecuteReaderAsync(ct);
             if (!await reader.ReadAsync(ct))
-                return false;
+                return null;
             attempt = EndingAttempt.Read(reader);
         }
 
@@ -210,6 +217,6 @@ public sealed class LeaseReaper(NpgsqlDataSource dataSource, DefinitionGraphCach
             error ?? TaskErrors.Json("LeaseExpired", "The host stopped renewing the lease."), ct);
 
         await transaction.CommitAsync(ct);
-        return true;
+        return attempt.HostGroupId;
     }
 }

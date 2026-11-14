@@ -40,6 +40,7 @@ public static class PersistenceServiceCollectionExtensions
         services.AddSingleton<CronTriggers>();
         services.AddSingleton<RunAdmission>();
         services.AddSingleton<RunQueries>();
+        services.AddSingleton<QueueStats>();
         services.AddSingleton<TaskLogReader>();
         return services;
     }

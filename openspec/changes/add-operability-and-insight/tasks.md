@@ -27,8 +27,8 @@
 
 ## 4. Queue statistics (OBS-04)
 
-- [ ] 4.1 `QueueStats.ReadAsync` and `GET /api/queue/stats` (decision 24); verify Testcontainers tests `Queue_stats_show_queued_oldest_wait_and_active_leases`, `Lease_expirations_count_the_last_hour_only`, `Idle_group_is_listed_with_zeros`; record `EXPLAIN (ANALYZE)` over the G1 load data in `docs/reports/m7-queue-stats.md`
-- [ ] 4.2 Lease expirations per group from the reaper, `QueueMetricsLoop` and the gauges (decision 30); verify `Expired_lease_increments_the_group_counter` and `Oldest_wait_gauge_reports_within_30_s` with a `MeterListener`
+- [x] 4.1 `QueueStats.ReadAsync` and `GET /api/queue/stats` (decision 24); verify Testcontainers tests `Queue_stats_show_queued_oldest_wait_and_active_leases`, `Lease_expirations_count_the_last_hour_only`, `Idle_group_is_listed_with_zeros`; record `EXPLAIN (ANALYZE)` over G1-sized data (`M7QueueStatsLoadTests`, Category=Load) in `docs/reports/m7-queue-stats.md`
+- [x] 4.2 Lease expirations per group from the reaper, `QueueMetricsLoop` and the gauges (decision 30); verify `Expired_lease_increments_the_group_counter` and `Oldest_wait_gauge_reports_within_30_s` with a `MeterListener`
 
 ## 5. Notifications (OBS-05)
 

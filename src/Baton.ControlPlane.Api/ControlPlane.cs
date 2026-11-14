@@ -1,6 +1,7 @@
 using Baton.ControlPlane.Api.Audit;
 using Baton.ControlPlane.Api.Automations;
 using Baton.ControlPlane.Api.Hosts;
+using Baton.ControlPlane.Api.Queue;
 using Baton.ControlPlane.Api.Runs;
 using Baton.ControlPlane.Api.Security;
 using Baton.ControlPlane.Api.Workflows;
@@ -39,6 +40,7 @@ public static class ControlPlane
         app.MapWebhooks();
         app.MapRuns();
         app.MapAudit();
+        app.MapQueue();
         return app;
     }
 }

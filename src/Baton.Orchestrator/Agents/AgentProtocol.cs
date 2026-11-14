@@ -43,6 +43,7 @@ public static class AgentProtocol
         services.AddHostedService<RetryPromoterLoop>();
         services.AddHostedService<LimitReconcilerLoop>();
         services.AddHostedService<AgingLoop>();
+        services.AddHostedService<QueueMetricsLoop>();
         return services;
     }
 

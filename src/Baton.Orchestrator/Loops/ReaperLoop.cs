@@ -1,4 +1,5 @@
 using Baton.Orchestrator.Dispatch;
+using Baton.Orchestrator.Health;
 using Baton.Persistence.Queue;
 using Microsoft.Extensions.Options;
 
@@ -10,7 +11,8 @@ namespace Baton.Orchestrator.Loops;
 /// Since M4 it also closes cancelled attempts past the 30 s grace (ORC-11) and cancels runs past their
 /// deadline (AUT-09).
 /// </summary>
-public sealed partial class ReaperLoop(LeaseReaper reaper, IOptions<DispatchOptions> options, ILogger<ReaperLoop> logger)
+public sealed partial class ReaperLoop(
+    LeaseReaper reaper, IOptions<DispatchOptions> options, OrchestratorMetrics metrics, ILogger<ReaperLoop> logger)
     : PeriodicLoop(logger)
 {
     protected override TimeSpan Interval => options.Value.ReaperInterval;
@@ -18,6 +20,7 @@ public sealed partial class ReaperLoop(LeaseReaper reaper, IOptions<DispatchOpti
     protected internal override async Task TickAsync(CancellationToken ct)
     {
         var summary = await reaper.ReapAsync(ct);
+        metrics.LeasesExpired(summary.LostByGroup);
         if (summary.Lost > 0 || summary.TimedOut > 0)
             LogReaped(Logger, summary.Lost, summary.TimedOut);
         if (summary.HostsMarkedOffline > 0)
