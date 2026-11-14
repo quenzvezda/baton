@@ -2,7 +2,10 @@ namespace Baton.Domain.Automations;
 
 /// <summary>A trigger as an Operator configures it (AUT-04).</summary>
 /// <param name="Kind"><c>cron</c>, <c>webhook</c> or <c>manual</c>.</param>
-public sealed record TriggerSettings(string? Kind, string? CronExpression = null, string? TimeZone = null);
+/// <param name="MisfirePolicy"><c>fire_once</c> (when absent), <c>skip</c> or <c>catch_up</c>; cron only (AUT-08).</param>
+/// <param name="CatchUpLimit">1–10 for <c>catch_up</c> (3 when absent); absent for the other policies.</param>
+public sealed record TriggerSettings(
+    string? Kind, string? CronExpression = null, string? TimeZone = null, string? MisfirePolicy = null, int? CatchUpLimit = null);
 
 /// <summary>An automation as an Operator configures it (AUT-01, AUT-02, AUT-05, AUT-06, AUT-07, AUT-09).</summary>
 /// <param name="WorkflowVersion"><c>null</c> follows the latest registered version.</param>
@@ -95,10 +98,13 @@ public static class AutomationRules
                     CronSchedule.TryCreate(trigger.CronExpression, trigger.TimeZone, out var cronErrors);
                     foreach (var (field, message) in cronErrors)
                         errors[$"{path}.{field}"] = [message];
+                    ValidateMisfire(trigger, path, errors);
                     break;
                 case WebhookKind or ManualKind:
                     if (trigger.CronExpression is not null || trigger.TimeZone is not null)
                         errors[$"{path}.cronExpression"] = ["Only cron triggers have a cron expression and time zone."];
+                    if (trigger.MisfirePolicy is not (null or "fire_once") || trigger.CatchUpLimit is not null)
+                        errors[$"{path}.misfirePolicy"] = ["Only cron triggers have a misfire policy."];
                     break;
                 default:
                     errors[$"{path}.kind"] = ["One of 'cron', 'webhook', 'manual'."];
@@ -106,6 +112,26 @@ public static class AutomationRules
             }
         }
     }
+
+    /// <summary>AUT-08: a known policy; a catch-up limit of 1–10, and only for CatchUp.</summary>
+    private static void ValidateMisfire(TriggerSettings trigger, string path, Dictionary<string, string[]> errors)
+    {
+        if (!MisfirePolicies.TryParse(trigger.MisfirePolicy ?? "fire_once", out var policy))
+        {
+            errors[$"{path}.misfirePolicy"] = ["One of 'fire_once', 'skip', 'catch_up'."];
+            return;
+        }
+
+        if (policy != MisfirePolicy.CatchUp && trigger.CatchUpLimit is not null)
+            errors[$"{path}.catchUpLimit"] = ["Only a CatchUp trigger has a catch-up limit."];
+        else if (trigger.CatchUpLimit is < MisfirePolicies.MinCatchUpLimit or > MisfirePolicies.MaxCatchUpLimit)
+            errors[$"{path}.catchUpLimit"] =
+                [$"Must be between {MisfirePolicies.MinCatchUpLimit} and {MisfirePolicies.MaxCatchUpLimit}, or absent for {MisfirePolicies.DefaultCatchUpLimit}."];
+    }
+
+    /// <summary>The stored catch-up limit: the given or default limit for CatchUp, none otherwise.</summary>
+    public static short? CatchUpLimitFor(string? misfirePolicy, int? catchUpLimit) =>
+        misfirePolicy == "catch_up" ? (short)(catchUpLimit ?? MisfirePolicies.DefaultCatchUpLimit) : null;
 
     /// <summary>Key of the automation's run limit row in <c>concurrency_limits</c> (ADR-0009).</summary>
     public static string AutomationLimitKey(Guid automationId) => $"automation:{automationId}";

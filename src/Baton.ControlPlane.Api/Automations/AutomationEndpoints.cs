@@ -14,7 +14,11 @@ using Npgsql;
 namespace Baton.ControlPlane.Api.Automations;
 
 /// <summary>A trigger in a create or update body; an <see cref="Id"/> keeps that existing trigger.</summary>
-public sealed record TriggerRequest(Guid? Id, string? Kind, string? CronExpression = null, string? TimeZone = null, bool? Enabled = null);
+/// <param name="MisfirePolicy">Cron only: <c>fire_once</c> (default), <c>skip</c> or <c>catch_up</c> (AUT-08).</param>
+/// <param name="CatchUpLimit">CatchUp only: 1–10, default 3.</param>
+public sealed record TriggerRequest(
+    Guid? Id, string? Kind, string? CronExpression = null, string? TimeZone = null, bool? Enabled = null,
+    string? MisfirePolicy = null, int? CatchUpLimit = null);
 
 /// <summary>Body of create and update (AUT-01..AUT-09). Absent optional settings take their defaults.</summary>
 public sealed record AutomationRequest(
@@ -44,7 +48,9 @@ public sealed record TriggerResponse(
     DateTimeOffset? NextFireAt,
     DateTimeOffset? LastFiredAt,
     string? WebhookUrl,
-    string? WebhookSecret);
+    string? WebhookSecret,
+    string? MisfirePolicy,
+    int? CatchUpLimit);
 
 /// <param name="Version">The value of the ETag; send it back in <c>If-Match</c> to update.</param>
 public sealed record AutomationResponse(
@@ -144,7 +150,8 @@ public static class AutomationEndpoints
         automation.UpdatedAt = now;
         db.Automations.Add(automation);
         foreach (var trigger in request.Triggers!)
-            db.AutomationTriggers.Add(NewTrigger(automation.Id, trigger.Kind!, trigger.CronExpression, trigger.TimeZone, trigger.Enabled ?? true, now, secrets, issued));
+            db.AutomationTriggers.Add(NewTrigger(automation.Id, trigger.Kind!, trigger.CronExpression, trigger.TimeZone, trigger.Enabled ?? true, now, secrets, issued,
+                trigger.MisfirePolicy, trigger.CatchUpLimit));
 
         if (!await SaveAsync(db, ct))
             return DuplicateName(automation.Name);
@@ -198,7 +205,8 @@ public static class AutomationEndpoints
             var current = trigger.Id is { } triggerId ? existing.Single(t => t.Id == triggerId) : null;
             if (current is null)
             {
-                db.AutomationTriggers.Add(NewTrigger(id, trigger.Kind!, trigger.CronExpression, trigger.TimeZone, trigger.Enabled ?? true, now, secrets, issued));
+                db.AutomationTriggers.Add(NewTrigger(id, trigger.Kind!, trigger.CronExpression, trigger.TimeZone, trigger.Enabled ?? true, now, secrets, issued,
+                    trigger.MisfirePolicy, trigger.CatchUpLimit));
                 continue;
             }
 
@@ -207,6 +215,7 @@ public static class AutomationEndpoints
             var scheduleChanged = current.CronExpr != trigger.CronExpression || current.TimeZone != trigger.TimeZone;
             var resumed = (enabled && !current.Enabled) || (automation.Enabled && !wasEnabled);
             (current.CronExpr, current.TimeZone, current.Enabled) = (trigger.CronExpression, trigger.TimeZone, enabled);
+            SetMisfire(current, trigger.MisfirePolicy, trigger.CatchUpLimit);
             if (current.Kind == AutomationRules.CronKind && (scheduleChanged || resumed || current.NextFireAt is null))
                 current.NextFireAt = NextFire(current, now);
         }
@@ -291,7 +300,8 @@ public static class AutomationEndpoints
         clone.UpdatedAt = now;
         db.Automations.Add(clone);
         foreach (var trigger in sourceTriggers)
-            db.AutomationTriggers.Add(NewTrigger(clone.Id, trigger.Kind, trigger.CronExpr, trigger.TimeZone, trigger.Enabled, now, secrets, issued));
+            db.AutomationTriggers.Add(NewTrigger(clone.Id, trigger.Kind, trigger.CronExpr, trigger.TimeZone, trigger.Enabled, now, secrets, issued,
+                trigger.MisfirePolicy, trigger.CatchUpLimit));
 
         if (!await SaveAsync(db, ct))
             return DuplicateName(clone.Name);
@@ -404,7 +414,7 @@ public static class AutomationEndpoints
             request.RequiredLabels, request.Priority ?? AutomationRules.DefaultPriority,
             request.MaxConcurrentRuns ?? AutomationRules.DefaultMaxConcurrentRuns,
             request.ConcurrencyPolicy ?? ConcurrencyPolicies.ToDb(ConcurrencyPolicy.Skip), request.RunTimeout,
-            request.Triggers?.Select(t => new TriggerSettings(t?.Kind, t?.CronExpression, t?.TimeZone)).ToList());
+            request.Triggers?.Select(t => new TriggerSettings(t?.Kind, t?.CronExpression, t?.TimeZone, t?.MisfirePolicy, t?.CatchUpLimit)).ToList());
         var errors = AutomationRules.Validate(settings);
 
         if (request.HostGroupId is { } groupId && !errors.ContainsKey("hostGroupId")
@@ -471,7 +481,7 @@ public static class AutomationEndpoints
 
     private static AutomationTriggerEntity NewTrigger(
         Guid automationId, string kind, string? cronExpression, string? timeZone, bool enabled, DateTimeOffset now,
-        WebhookSecrets secrets, Dictionary<Guid, string> issued)
+        WebhookSecrets secrets, Dictionary<Guid, string> issued, string? misfirePolicy, int? catchUpLimit)
     {
         var trigger = new AutomationTriggerEntity
         {
@@ -482,6 +492,7 @@ public static class AutomationEndpoints
             TimeZone = timeZone,
             Enabled = enabled,
         };
+        SetMisfire(trigger, misfirePolicy, catchUpLimit);
 
         if (kind == AutomationRules.CronKind)
             trigger.NextFireAt = NextFire(trigger, now);
@@ -494,6 +505,13 @@ public static class AutomationEndpoints
         }
 
         return trigger;
+    }
+
+    /// <summary>AUT-08, design.md decision 7: absent means FireOnce; CatchUp without a limit gets 3.</summary>
+    private static void SetMisfire(AutomationTriggerEntity trigger, string? misfirePolicy, int? catchUpLimit)
+    {
+        trigger.MisfirePolicy = misfirePolicy ?? MisfirePolicies.ToDb(MisfirePolicy.FireOnce);
+        trigger.CatchUpLimit = AutomationRules.CatchUpLimitFor(trigger.MisfirePolicy, catchUpLimit);
     }
 
     private static DateTimeOffset? NextFire(AutomationTriggerEntity trigger, DateTimeOffset now) =>
@@ -570,7 +588,9 @@ public static class AutomationEndpoints
             .. triggers.OrderBy(t => t.Id).Select(t => new TriggerResponse(
                 t.Id, t.Kind, t.CronExpr, t.TimeZone, t.Enabled, t.NextFireAt, t.LastFiredAt,
                 t.Kind == AutomationRules.WebhookKind ? $"/api/webhooks/{t.Id}" : null,
-                issuedSecrets?.GetValueOrDefault(t.Id))),
+                issuedSecrets?.GetValueOrDefault(t.Id),
+                t.Kind == AutomationRules.CronKind ? t.MisfirePolicy : null,
+                t.CatchUpLimit)),
         ]);
 
     private static ProblemHttpResult Stale() => TypedResults.Problem(statusCode: StatusCodes.Status412PreconditionFailed,

@@ -121,6 +121,9 @@ public static class RunEventTypes
     /// <summary>A firing under Skip at the limit; recorded under the automation's id, as no run exists.</summary>
     public const string RunSkipped = "run.skipped";
 
+    /// <summary>Missed cron fire times the misfire policy passed over (AUT-08); filed under the automation's id.</summary>
+    public const string TriggerMisfired = "trigger.misfired";
+
     /// <summary>Admission passed the run over; written when the limit it waits for changes, not on every tick.</summary>
     public const string RunBlocked = "run.blocked";
 

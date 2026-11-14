@@ -8,9 +8,9 @@
 
 ## 2. Misfire policy and fire time preview (AUT-08, AUT-10)
 
-- [ ] 2.1 Trigger API fields `misfirePolicy` and `catchUpLimit` (decision 7): default 3 for CatchUp, rejected limit outside 1–10 or on another policy, webhook triggers keep the default; verify `Catch_up_limit_out_of_range_is_rejected`, `Catch_up_without_limit_defaults_to_3`, `Misfire_policy_round_trips`
-- [ ] 2.2 `CronTriggers` fires through `MisfirePlanner` and records `trigger.misfired`; verify Testcontainers tests `FireOnce_after_an_outage_creates_one_run_for_the_latest_missed_time`, `Skip_after_an_outage_creates_no_run_and_records_the_miss`, `CatchUp_creates_the_3_most_recent_missed_runs`, `Slightly_late_fire_is_not_a_misfire`, `Catch_up_runs_follow_the_concurrency_policy`, and that the existing `Two_replicas_firing_the_same_due_trigger_create_one_run` still passes
-- [ ] 2.3 `GET /api/cron/preview` (decision 8); verify `Preview_returns_the_next_5_fire_times_in_the_zone`, `Preview_of_an_expression_that_stops_firing_returns_fewer`, `Invalid_expression_preview_is_rejected_with_the_save_message`
+- [x] 2.1 Trigger API fields `misfirePolicy` and `catchUpLimit` (decision 7): default 3 for CatchUp, rejected limit outside 1–10 or on another policy, webhook triggers keep the default; verify `Catch_up_limit_out_of_range_is_rejected`, `Catch_up_without_limit_defaults_to_3`, `Misfire_policy_round_trips`
+- [x] 2.2 `CronTriggers` fires through `MisfirePlanner` and records `trigger.misfired`; verify Testcontainers tests `FireOnce_after_an_outage_creates_one_run_for_the_latest_missed_time`, `Skip_after_an_outage_creates_no_run_and_records_the_miss`, `CatchUp_creates_the_3_most_recent_missed_runs`, `Slightly_late_fire_is_not_a_misfire`, `Catch_up_runs_follow_the_concurrency_policy`, and that the existing `Two_replicas_firing_the_same_due_trigger_create_one_run` still passes
+- [x] 2.3 `GET /api/cron/preview` (decision 8); verify `Preview_returns_the_next_5_fire_times_in_the_zone`, `Preview_of_an_expression_that_stops_firing_returns_fewer`, `Invalid_expression_preview_is_rejected_with_the_save_message`
 
 ## 3. Priority aging (ORC-06)
 
