@@ -252,6 +252,8 @@ Today's state, from the code:
       locked_until timestamptz, last_error text, created_at timestamptz NOT NULL DEFAULT now(),
       sent_at timestamptz);
     CREATE INDEX ix_deliveries_due ON notification_deliveries (next_attempt_at) WHERE status = 'pending';
+    CREATE INDEX ix_deliveries_run ON notification_deliveries (workflow_run_id);     -- run purge cascade, timeline
+    CREATE INDEX ix_deliveries_channel ON notification_deliveries (channel_id);     -- channel removal cascade
     ```
     The id is an identity column, like `run_events`, not a UUIDv7 (ADR-0010). The finalizer inserts a
     variable number of rows in one SQL statement, and Postgres 16 has no `uuidv7()`. A sequence keeps that
@@ -319,8 +321,8 @@ Today's state, from the code:
     once with "email delivery is not configured", and startup logs a warning when email channels exist.
     Options are validated at startup.
 23. **Key ring in the orchestrator.** `KeyRingProtection` and the Data Protection registration move from the
-    API into `src/Shared/BatonDataProtection.cs` (linked source, like `BatonTelemetry`). Both processes
-    call `AddBatonDataProtection(configuration)` with application name `baton`, the same table and the same
+    API into `Baton.Persistence/Security` (`BatonDataProtection`), which already references the Data
+    Protection EF package and owns the key table. Both processes call `AddBatonDataProtection(configuration)` with application name `baton`, the same table and the same
     certificate settings. The orchestrator only unprotects. `NotificationSecrets` (purposes in decision 16)
     lives in `Baton.Persistence`, so the API (protect) and the orchestrator (unprotect) share it.
 
@@ -346,12 +348,12 @@ Today's state, from the code:
 ### Telemetry (OBS-06)
 
 26. **Shared wiring split.** `BatonTelemetry.AddBatonTelemetry(builder, serviceName)` keeps the common part:
-    resource, HttpClient and Npgsql instrumentation, `Baton.*` meters and sources, logs, and OTLP when
+    resource, HttpClient instrumentation, `Baton.*` meters and sources, logs, and OTLP when
     `OTEL_EXPORTER_OTLP_ENDPOINT` is set. `AddBatonAspNetCoreTelemetry` adds the ASP.NET Core
-    instrumentation and the health-probe filter.
-    - API, orchestrator and web call both.
-    - The agent calls the common part only. The agent does not use Npgsql, and its Npgsql instrumentation
-      is a no-op.
+    instrumentation and the health-probe filter, and `AddBatonNpgsqlTelemetry` the Npgsql instrumentation.
+    - API and orchestrator call all three, web the first two.
+    - The agent calls the common part only, through `AddBatonAgentTelemetry`, so it needs no ASP.NET Core
+      or Npgsql package.
     - Resource attributes: `service.name` (`control-plane-api`, `orchestrator`, `agent`, `web`),
       `service.version` (assembly informational version), `service.instance.id` (agent host name,
       otherwise machine name).

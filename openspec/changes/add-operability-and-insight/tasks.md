@@ -2,11 +2,11 @@
 
 ## 1. Schema, shared wiring and domain
 
-- [ ] 1.1 Migration `OperabilityAndInsight` (design.md "Migration Plan"): `audit_log`, `notification_channels`, `notification_deliveries`, `ix_deliveries_due`, `workflow_runs.reruns` and `trace_parent`, `ix_attempts_lost`; verify `Schema_matches_baseline` (updated) and `Lost_attempt_index_exists_on_every_partition` (`dotnet test tests/Baton.Integration.Tests --filter Schema`)
-- [ ] 1.2 `RerunPlan` in `Baton.Domain` (decision 8); verify unit tests `Last_task_failed_resets_it_and_its_skipped_downstream`, `Succeeded_failure_only_task_is_kept`, `Skipped_task_with_kept_upstream_stays_skipped`, `Diamond_resets_only_the_failed_branch_and_the_join`, `Timed_out_run_resets_cancelled_waiting_tasks`, `Reset_task_whose_rule_no_longer_fires_is_skipped_and_propagates`
-- [ ] 1.3 `NotificationSchedule.Delay` in `Baton.Domain` (decision 19); verify unit tests `Delays_are_1_5_15_30_minutes_with_jitter` and `Fifth_failure_is_final`
-- [ ] 1.4 Data Protection registration and `KeyRingProtection` moved to `src/Shared/BatonDataProtection.cs`, used by API and orchestrator; `NotificationSecrets` in `Baton.Persistence` (decision 23); verify `Secret_protected_by_the_api_is_read_by_the_orchestrator` (two service providers over one Testcontainers database) and that the existing webhook secret tests still pass
-- [ ] 1.5 Split `BatonTelemetry` into the common part and `AddBatonAspNetCoreTelemetry`, with resource attributes; wire `Baton.Agent` and `Baton.Web` (decision 26); verify `Agent_starts_with_telemetry_and_no_endpoint` and `Resource_names_service_version_and_instance`, and `dotnet build Baton.slnx -c Release` clean
+- [x] 1.1 Migration `OperabilityAndInsight` (design.md "Migration Plan"): `audit_log`, `notification_channels`, `notification_deliveries`, `ix_deliveries_due`, `workflow_runs.reruns` and `trace_parent`, `ix_attempts_lost`; verify `Schema_matches_baseline` (updated) and `Lost_attempt_index_exists_on_every_partition` (`dotnet test tests/Baton.Integration.Tests --filter Schema`)
+- [x] 1.2 `RerunPlan` in `Baton.Domain` (decision 8); verify unit tests `Last_task_failed_resets_it_and_its_skipped_downstream`, `Succeeded_failure_only_task_is_kept`, `Skipped_task_with_kept_upstream_stays_skipped`, `Diamond_resets_only_the_failed_branch_and_the_join`, `Timed_out_run_resets_cancelled_waiting_tasks`, `Reset_task_whose_rule_no_longer_fires_is_skipped_and_propagates`
+- [x] 1.3 `NotificationSchedule.Delay` in `Baton.Domain` (decision 19); verify unit tests `Delays_are_1_5_15_30_minutes_with_jitter` and `Fifth_failure_is_final`
+- [x] 1.4 Data Protection registration (`AddBatonDataProtection`) and `KeyRingProtection` moved to `Baton.Persistence/Security`, used by API and orchestrator; `NotificationSecrets` in `Baton.Persistence` (decision 23); verify `Secret_protected_by_the_api_is_read_by_the_orchestrator` (two service providers over one Testcontainers database) and that the existing webhook secret tests still pass
+- [x] 1.5 Split `BatonTelemetry` into the common part, `AddBatonAspNetCoreTelemetry` and `AddBatonNpgsqlTelemetry`, with resource attributes; wire `Baton.Agent` and `Baton.Web` (decision 26); verify `Agent_starts_with_telemetry_and_no_endpoint` and `Resource_names_service_version_and_instance`, and `dotnet build Baton.slnx -c Release` clean
 
 ## 2. Audit trail (AUT-11)
 

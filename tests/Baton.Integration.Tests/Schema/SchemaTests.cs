@@ -85,6 +85,22 @@ public sealed class SchemaTests(PostgresFixture pg)
             "SELECT bool_or(pinned_run) FROM task_runs WHERE workflow_run_id = @id", ("id", runId)));
     }
 
+    // M7 task 1.1: the partial index on the partitioned parent is created on every monthly partition, existing
+    // ones included, so the lease-expiration count (OBS-04) never scans a partition.
+    [Fact]
+    public async Task Lost_attempt_index_exists_on_every_partition()
+    {
+        var partitions = await HostData.ScalarAsync<long>(pg, """
+            SELECT count(*) FROM pg_inherits WHERE inhparent = 'task_attempts'::regclass
+            """);
+        var indexed = await HostData.ScalarAsync<long>(pg, """
+            SELECT count(*) FROM pg_inherits WHERE inhparent = 'ix_attempts_lost'::regclass
+            """);
+
+        Assert.True(partitions > 0);
+        Assert.Equal(partitions, indexed);
+    }
+
     private async Task<HashSet<string>> DescribeBaselineAsync()
     {
         await using (var cmd = pg.DataSource.CreateCommand(

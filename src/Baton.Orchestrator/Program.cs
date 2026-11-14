@@ -2,15 +2,18 @@ using Baton.Orchestrator.Agents;
 using Baton.Orchestrator.Health;
 using Baton.Orchestrator.Loops;
 using Baton.Persistence;
+using Baton.Persistence.Security;
 using Baton.Telemetry;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.AddBatonTelemetry("orchestrator");
+builder.AddBatonTelemetry("orchestrator").AddBatonAspNetCoreTelemetry().AddBatonNpgsqlTelemetry();
 builder.Services.AddBatonPersistence(builder.Configuration.GetConnectionString("Baton"));
 builder.Services.AddBatonListenDataSource(builder.Configuration.GetConnectionString("BatonListen"));
+// Notification secrets (ADR-0018): the key ring shared with the Control Plane API.
+builder.Services.AddBatonDataProtection(builder.Configuration);
 builder.Services.AddHealthChecks()
     .AddCheck<PostgresHealthCheck>("postgres")
     .AddCheck<HistoryPartitionsHealthCheck>("history-partitions");
