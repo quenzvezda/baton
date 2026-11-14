@@ -118,6 +118,50 @@ public sealed class SchedulingApiTests(PostgresFixture pg) : IAsyncLifetime
         Assert.Equal(save["triggers[0].cronExpression"], preview["cronExpression"]);
     }
 
+    [Fact]
+    public async Task Default_placement_is_per_task()
+    {
+        var (automation, _) = await _api.CreateAsync(_api.Request());
+
+        Assert.Equal("per_task", automation.PlacementMode);
+        var invalid = await ValidationErrorsAsync(await _api.Operator.PostAsJsonAsync("/api/automations",
+            _api.Request() with { PlacementMode = "same_host" }));
+        Assert.Equal(["placementMode"], invalid.Keys);
+    }
+
+    [Fact]
+    public async Task Placement_change_does_not_affect_active_runs()
+    {
+        var (automation, etag) = await _api.CreateAsync(_api.Request(policy: "allow", maxRuns: 10));
+        var before = await _api.RunNowAsync(automation.Id);
+
+        using var update = new HttpRequestMessage(HttpMethod.Put, $"/api/automations/{automation.Id}")
+        {
+            Content = JsonContent.Create(_api.Request(automation.Name, [new TriggerRequest(automation.Triggers[0].Id, "cron", "0 2 * * *", "Asia/Singapore")],
+                policy: "allow", maxRuns: 10) with { PlacementMode = "pinned_run" }),
+        };
+        update.Headers.IfMatch.Add(new System.Net.Http.Headers.EntityTagHeaderValue(etag));
+        var updated = (await (await _api.Operator.SendAsync(update)).Content.ReadFromJsonAsync<AutomationResponse>())!;
+        var after = await _api.RunNowAsync(automation.Id);
+
+        Assert.Equal("pinned_run", updated.PlacementMode);
+        Assert.Equal("per_task", await PlacementAsync(before));
+        Assert.Equal("pinned_run", await PlacementAsync(after));
+    }
+
+    [Fact]
+    public async Task Clone_keeps_the_placement()
+    {
+        var (automation, _) = await _api.CreateAsync(_api.Request() with { PlacementMode = "pinned_run" });
+
+        var response = await _api.Operator.PostAsJsonAsync($"/api/automations/{automation.Id}/clone", new CloneRequest(HostData.NewName("copy")));
+
+        Assert.Equal("pinned_run", (await response.Content.ReadFromJsonAsync<AutomationResponse>())!.PlacementMode);
+    }
+
+    private Task<string> PlacementAsync(Guid runId) =>
+        HostData.ScalarAsync<string>(pg, "SELECT placement_mode FROM workflow_runs WHERE id = @id", ("id", runId));
+
     internal static async Task<IDictionary<string, string[]>> ValidationErrorsAsync(HttpResponseMessage response)
     {
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);

@@ -14,13 +14,16 @@ public sealed record NewRun(
     IReadOnlyList<string> RequiredLabels,
     string TriggerKind,
     string IdempotencyKey,
-    Guid? AutomationId = null);
+    Guid? AutomationId = null,
+    string PlacementMode = "per_task");
 
 /// <summary>
 /// Creates the <c>task_runs</c> of a Running run (ORC-03 "Root tasks", design.md "Run start"): tasks
 /// without dependencies Queued, all others Waiting; base priority = clamp(run priority + offset, 0, 100);
 /// required labels = the automation's ∪ the task's. M4 admission calls <see cref="CreateTasksAsync"/>
-/// inside its own transaction.
+/// inside its own transaction. For PinnedRun (ORC-12, M6 design.md decision 11) the run's pin labels are every
+/// label any of its tasks requires, so the first host to take a task can run them all, and each task is marked
+/// <c>pinned_run</c> so the claim checks the pin only for those.
 /// </summary>
 public sealed class RunMaterializer(NpgsqlDataSource dataSource, DefinitionGraphCache graphs)
 {
@@ -28,18 +31,21 @@ public sealed class RunMaterializer(NpgsqlDataSource dataSource, DefinitionGraph
 
     private const string InsertRunSql = """
         INSERT INTO workflow_runs (id, automation_id, definition_id, status, priority, host_group_id, parameters,
-                                   trigger_kind, idempotency_key, started_at)
+                                   trigger_kind, idempotency_key, started_at, placement_mode)
         VALUES (@id, @automationId, @definitionId, 'running', @priority, @groupId, @parameters, @triggerKind,
-                @idempotencyKey, now())
+                @idempotencyKey, now(), @placement)
         """;
 
     private const string InsertTaskSql = """
         INSERT INTO task_runs (id, workflow_run_id, task_key, status, trigger_rule, upstream_remaining, max_attempts,
                                timeout, priority, effective_priority, host_group_id, required_labels, definition_hash,
-                               queued_at)
+                               queued_at, pinned_run)
         VALUES (@id, @runId, @key, @status, @rule, @upstream, @maxAttempts, @timeout, @priority, @priority, @groupId,
-                @labels, @hash, CASE WHEN @status = 'queued' THEN now() END)
+                @labels, @hash, CASE WHEN @status = 'queued' THEN now() END,
+                (SELECT placement_mode = 'pinned_run' FROM workflow_runs WHERE id = @runId))
         """;
+
+    private const string PinLabelsSql = "UPDATE workflow_runs SET pin_labels = @labels WHERE id = @runId";
 
     public async Task<Guid> StartAsync(NewRun run, CancellationToken ct)
     {
@@ -67,6 +73,7 @@ public sealed class RunMaterializer(NpgsqlDataSource dataSource, DefinitionGraph
             insert.Parameters.AddWithValue("parameters", NpgsqlDbType.Jsonb, run.ParametersJson);
             insert.Parameters.AddWithValue("triggerKind", run.TriggerKind);
             insert.Parameters.AddWithValue("idempotencyKey", run.IdempotencyKey);
+            insert.Parameters.AddWithValue("placement", run.PlacementMode);
             await insert.ExecuteNonQueryAsync(ct);
         }
 
@@ -86,8 +93,10 @@ public sealed class RunMaterializer(NpgsqlDataSource dataSource, DefinitionGraph
 
         var graph = await graphs.GetAsync(definitionHash, ct);
         await using var batch = new NpgsqlBatch(connection, transaction);
+        var pinLabels = new SortedSet<string>(automationLabels, StringComparer.Ordinal);
         foreach (var task in graph.Tasks)
         {
+            pinLabels.UnionWith(task.RequiredLabels);
             var status = task.DependsOn.Count == 0 ? TaskRunStatus.Queued : TaskRunStatus.Waiting;
             var command = new NpgsqlBatchCommand(InsertTaskSql);
             command.Parameters.AddWithValue("id", Guid.CreateVersion7());
@@ -107,6 +116,11 @@ public sealed class RunMaterializer(NpgsqlDataSource dataSource, DefinitionGraph
             if (status == TaskRunStatus.Queued)
                 batch.BatchCommands.Add(RunEvents.Command(runId, task.Key, RunEventTypes.TaskQueued, new { attempt = 1 }));
         }
+
+        var pin = new NpgsqlBatchCommand(PinLabelsSql);
+        pin.Parameters.AddWithValue("runId", runId);
+        pin.Parameters.AddWithValue("labels", pinLabels.ToArray());
+        batch.BatchCommands.Insert(0, pin);
 
         batch.BatchCommands.Add(RunEvents.NotifyTasksReady(hostGroupId));
         await batch.ExecuteNonQueryAsync(ct);

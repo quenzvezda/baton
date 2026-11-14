@@ -21,7 +21,8 @@ public sealed record AutomationSettings(
     int MaxConcurrentRuns,
     string? ConcurrencyPolicy,
     TimeSpan? RunTimeout,
-    IReadOnlyList<TriggerSettings>? Triggers);
+    IReadOnlyList<TriggerSettings>? Triggers,
+    string? PlacementMode = null);
 
 /// <summary>Validation of automation settings and the limit keys of runs (AUT-01..AUT-09, ADR-0009).</summary>
 public static class AutomationRules
@@ -29,6 +30,12 @@ public static class AutomationRules
     public const string CronKind = "cron";
     public const string WebhookKind = "webhook";
     public const string ManualKind = "manual";
+
+    /// <summary>ORC-12: each task may run on any eligible host of the group (the default).</summary>
+    public const string PerTask = "per_task";
+
+    /// <summary>ORC-12: every task of a run runs on the host that took its first task.</summary>
+    public const string PinnedRun = "pinned_run";
 
     public const int MaxNameLength = 200;
     public const int MaxDescriptionLength = 2000;
@@ -68,6 +75,8 @@ public static class AutomationRules
             errors["maxConcurrentRuns"] = [$"Must be between 1 and {MaxMaxConcurrentRuns}."];
         if (!ConcurrencyPolicies.TryParse(settings.ConcurrencyPolicy, out _))
             errors["concurrencyPolicy"] = ["One of 'skip', 'queue', 'replace', 'allow'."];
+        if (settings.PlacementMode is not (null or PerTask or PinnedRun))
+            errors["placementMode"] = [$"One of '{PerTask}', '{PinnedRun}'."];
         if (settings.RunTimeout is { } timeout && (timeout <= TimeSpan.Zero || timeout > MaxRunTimeout))
             errors["runTimeout"] = [$"Must be positive and at most {MaxRunTimeout.TotalDays:0} days, or absent for none."];
 

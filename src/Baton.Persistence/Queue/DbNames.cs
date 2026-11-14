@@ -86,6 +86,7 @@ public static class DbNames
         RunCancelReason.User => "user",
         RunCancelReason.Replaced => "replaced",
         RunCancelReason.Timeout => "timeout",
+        RunCancelReason.PinnedHostLost => "pinned_host_lost",
         _ => throw new ArgumentOutOfRangeException(nameof(reason), reason, null),
     };
 }
@@ -101,6 +102,9 @@ public enum RunCancelReason
 
     /// <summary>It passed its deadline (AUT-09).</summary>
     Timeout,
+
+    /// <summary>The host a PinnedRun run is pinned to went Offline or left the group; the run ends Failed (ORC-12, OQ-04).</summary>
+    PinnedHostLost,
 }
 
 /// <summary><c>run_events.type</c> values written by dispatch (design.md "Decisions agreed with the owner").</summary>

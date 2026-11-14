@@ -35,7 +35,8 @@ public sealed record AutomationRequest(
     int? Priority = null,
     int? MaxConcurrentRuns = null,
     string? ConcurrencyPolicy = null,
-    TimeSpan? RunTimeout = null);
+    TimeSpan? RunTimeout = null,
+    string? PlacementMode = null);
 
 /// <param name="WebhookUrl">Where a webhook trigger receives deliveries.</param>
 /// <param name="WebhookSecret">Only in the response that issued it (create, clone, rotate-secret).</param>
@@ -70,7 +71,8 @@ public sealed record AutomationResponse(
     TimeSpan? RunTimeout,
     DateTimeOffset UpdatedAt,
     int Version,
-    TriggerResponse[] Triggers);
+    TriggerResponse[] Triggers,
+    string PlacementMode);
 
 public sealed record CloneRequest(string? Name);
 
@@ -414,7 +416,8 @@ public static class AutomationEndpoints
             request.RequiredLabels, request.Priority ?? AutomationRules.DefaultPriority,
             request.MaxConcurrentRuns ?? AutomationRules.DefaultMaxConcurrentRuns,
             request.ConcurrencyPolicy ?? ConcurrencyPolicies.ToDb(ConcurrencyPolicy.Skip), request.RunTimeout,
-            request.Triggers?.Select(t => new TriggerSettings(t?.Kind, t?.CronExpression, t?.TimeZone, t?.MisfirePolicy, t?.CatchUpLimit)).ToList());
+            request.Triggers?.Select(t => new TriggerSettings(t?.Kind, t?.CronExpression, t?.TimeZone, t?.MisfirePolicy, t?.CatchUpLimit)).ToList(),
+            request.PlacementMode);
         var errors = AutomationRules.Validate(settings);
 
         if (request.HostGroupId is { } groupId && !errors.ContainsKey("hostGroupId")
@@ -477,6 +480,7 @@ public static class AutomationEndpoints
         automation.MaxConcurrentRuns = request.MaxConcurrentRuns ?? AutomationRules.DefaultMaxConcurrentRuns;
         automation.ConcurrencyPolicy = request.ConcurrencyPolicy ?? ConcurrencyPolicies.ToDb(ConcurrencyPolicy.Skip);
         automation.RunTimeout = request.RunTimeout;
+        automation.PlacementMode = request.PlacementMode ?? AutomationRules.PerTask;
     }
 
     private static AutomationTriggerEntity NewTrigger(
@@ -591,7 +595,8 @@ public static class AutomationEndpoints
                 issuedSecrets?.GetValueOrDefault(t.Id),
                 t.Kind == AutomationRules.CronKind ? t.MisfirePolicy : null,
                 t.CatchUpLimit)),
-        ]);
+        ],
+        a.PlacementMode);
 
     private static ProblemHttpResult Stale() => TypedResults.Problem(statusCode: StatusCodes.Status412PreconditionFailed,
         title: "Automation changed", detail: "The automation changed since you read it; reload it and apply your change again.");

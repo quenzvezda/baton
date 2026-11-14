@@ -21,11 +21,11 @@
 
 ## 4. Placement mode (ORC-12)
 
-- [ ] 4.1 Automation API `placementMode` (create, update, clone, read), copied to the run at creation (decision 11); verify `Default_placement_is_per_task` and `Placement_change_does_not_affect_active_runs`
-- [ ] 4.2 `RunMaterializer` writes `pin_labels` and `pinned_run`; verify `Pin_labels_are_the_union_of_every_task_label`
-- [ ] 4.3 Pinning in the claim transaction (decision 12); verify Testcontainers tests `First_claim_pins_the_run`, `Task_of_a_run_pinned_elsewhere_is_not_leased`, `Pinned_host_must_carry_labels_of_the_whole_run`, `Retry_goes_to_the_pinned_host`, and the concurrent-actor test `Concurrent_claims_of_parallel_roots_pin_one_host`
-- [ ] 4.4 Draining host serves only its pinned runs (decision 5); verify `Draining_host_takes_tasks_of_its_pinned_run_only` and that the existing `Drained_host_learns_it_from_the_heartbeat_reply_and_is_not_eligible` still passes
-- [ ] 4.5 Pinned host lost in the reaper (decision 13); verify `Run_fails_when_its_pinned_host_goes_offline`, `Run_fails_when_its_pinned_host_is_moved`, `Pinned_host_restarting_within_30_s_keeps_the_run`; add the pinned-run note to `docs/runbooks/agent-rollout.md`
+- [x] 4.1 Automation API `placementMode` (create, update, clone, read), copied to the run at creation (decision 11); verify `Default_placement_is_per_task` and `Placement_change_does_not_affect_active_runs`
+- [x] 4.2 `RunMaterializer` writes `pin_labels` and `pinned_run`; verify `Pin_labels_are_the_union_of_every_task_label`
+- [x] 4.3 Pinning in the claim transaction (decision 12); verify Testcontainers tests `First_claim_pins_the_run`, `Task_of_a_run_pinned_elsewhere_is_not_leased`, `Pinned_host_must_carry_labels_of_the_whole_run`, `Retry_goes_to_the_pinned_host`, and the concurrent-actor test `Concurrent_claims_of_parallel_roots_pin_one_host`
+- [x] 4.4 Draining host serves only its pinned runs, and a drained agent keeps claiming (decision 5); verify `Draining_host_takes_tasks_of_its_pinned_run_only` and that the existing `Drained_host_learns_it_from_the_heartbeat_reply_and_is_not_eligible` still passes
+- [x] 4.5 Pinned host lost in the reaper (decision 13); verify `Run_fails_when_its_pinned_host_goes_offline`, `Run_fails_when_its_pinned_host_is_moved`, `Pinned_host_restarting_within_30_s_keeps_the_run`; add the pinned-run note to `docs/runbooks/agent-rollout.md`
 
 ## 5. Dispatch pause (ORC-13)
 

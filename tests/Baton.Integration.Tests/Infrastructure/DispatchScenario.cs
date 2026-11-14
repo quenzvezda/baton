@@ -87,8 +87,9 @@ internal sealed class DispatchScenario
     public Task<Guid> AddHostAsync(int slots = 4, string[]? labels = null, bool carriesDefinition = true) =>
         HostData.InsertHostAsync(Pg, GroupId, slots: slots, labels: labels, hashes: carriesDefinition ? [Hash] : []);
 
-    public Task<Guid> StartRunAsync(int priority = 50, string[]? labels = null, string parameters = "{}") =>
-        Runs.StartAsync(new NewRun(DefinitionId, GroupId, priority, parameters, labels ?? [], "manual", Guid.NewGuid().ToString()),
+    public Task<Guid> StartRunAsync(int priority = 50, string[]? labels = null, string parameters = "{}", bool pinned = false) =>
+        Runs.StartAsync(new NewRun(DefinitionId, GroupId, priority, parameters, labels ?? [], "manual", Guid.NewGuid().ToString(),
+                PlacementMode: pinned ? "pinned_run" : "per_task"),
             CancellationToken.None);
 
     public async Task<ClaimResult> ClaimAsync(Guid hostId, int freeSlots = 4) =>

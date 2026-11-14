@@ -53,7 +53,11 @@ never waits on a lock it can skip; aging writes only rows whose value changes.
 
 5. **A draining host keeps serving runs already pinned to it** (spec "Draining hosts", modified). Without
    this a rolling upgrade would leave every pinned run on that host waiting until its deadline. The drain
-   still stops new runs from pinning to the host, so it empties once its pinned runs finish.
+   still stops new runs from pinning to the host, so it empties once its pinned runs finish. The agent
+   therefore keeps claiming while an operator drains it (`AgentLifecycle.CanClaim` is true when Draining,
+   not when shutting down). The orchestrator decides what a draining host gets. An agent older than M6
+   stops claiming on drain, so its pinned runs wait until their deadline: upgrade agents before using
+   PinnedRun.
 
 ## Decisions
 
