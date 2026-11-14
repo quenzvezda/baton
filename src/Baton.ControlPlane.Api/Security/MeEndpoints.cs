@@ -20,6 +20,6 @@ public static class MeEndpoints
 
     private static Ok<CurrentUser> Get(ClaimsPrincipal user) =>
         TypedResults.Ok(new CurrentUser(
-            user.FindFirst("name")?.Value ?? user.FindFirst("preferred_username")?.Value ?? user.FindFirst("sub")?.Value ?? "unknown",
+            Actor.From(user).Name,
             [.. BatonRoles.All.Where(role => BatonRoles.Has(user, role))]));
 }

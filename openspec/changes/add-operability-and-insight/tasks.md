@@ -10,12 +10,12 @@
 
 ## 2. Audit trail (AUT-11)
 
-- [ ] 2.1 `AuditWriter` and actor helper shared with `/api/me` (decisions 12–13); verify `Entry_commits_with_the_change` and `Rejected_change_writes_no_entry` (412 and 400 cases)
-- [ ] 2.2 Audit every automation endpoint: create, update, delete, clone, enable, disable, rotate-secret, notification channel changes; verify `Automation_update_records_before_and_after`, `Automation_create_has_no_before`, `Deleted_automation_history_stays_readable`, `Secret_rotation_records_no_secret`
-- [ ] 2.3 Audit host group, agent credential and workflow limit endpoints (decision 3 and "Proposed here"); verify `Group_pause_is_audited_with_its_actor`, `Group_limit_change_records_before_and_after`, `Agent_token_revocation_records_no_token`, `Workflow_limit_set_is_audited`
-- [ ] 2.4 Redaction check over every audited DTO (decision 14); verify unit test `Audited_dtos_contain_no_secret_values` fails when a `[Secret]` property or a `whsec_` / agent-token value is serialized
-- [ ] 2.5 `GET /api/audit` with cursor and time range (decision 15); verify `History_of_an_automation_is_newest_first`, `Audit_cursor_pages_without_gaps_or_duplicates`, `Viewer_reads_the_audit_log`
-- [ ] 2.6 Audit retention in `PartitionMaintenanceLoop` (decision 15); verify Testcontainers test `Audit_entries_older_than_a_year_are_deleted` (366 days deleted, 364 kept) and `Audit_outlives_run_history`
+- [x] 2.1 `AuditWriter` and actor helper shared with `/api/me` (decisions 12–13); verify `Entry_commits_with_the_change` and `Rejected_change_writes_no_entry` (412 and 400 cases)
+- [x] 2.2 Audit every automation endpoint: create, update, delete, clone, enable, disable, rotate-secret, notification channel changes; verify `Automation_update_records_before_and_after`, `Automation_create_has_no_before`, `Deleted_automation_history_stays_readable`, `Secret_rotation_records_no_secret`
+- [x] 2.3 Audit host group, agent credential and workflow limit endpoints (decision 3 and "Proposed here"); verify `Group_pause_is_audited_with_its_actor`, `Group_limit_change_records_before_and_after`, `Agent_token_revocation_records_no_token`, `Workflow_limit_set_is_audited`
+- [x] 2.4 Redaction check over every audited DTO (decision 14); verify unit test `Audited_dtos_contain_no_secret_values` fails when a `[Secret]` property or a `whsec_` / agent-token value is serialized
+- [x] 2.5 `GET /api/audit` with cursor and time range (decision 15); verify `History_of_an_automation_is_newest_first`, `Audit_cursor_pages_without_gaps_or_duplicates`, `Viewer_reads_the_audit_log`
+- [x] 2.6 Audit retention in `PartitionMaintenanceLoop` (decision 15); verify Testcontainers test `Audit_entries_older_than_a_year_are_deleted` (366 days deleted, 364 kept) and `Audit_outlives_run_history`
 
 ## 3. Re-run failed tasks (WF-10)
 

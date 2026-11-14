@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using Baton.ControlPlane.Api.Audit;
 using Baton.ControlPlane.Api.Security;
 using Baton.Domain.Hosts;
 using Baton.Persistence;
@@ -19,7 +21,10 @@ public sealed record HostGroupResponse(
 public sealed record AgentTokenRequest(string? Name);
 
 /// <summary>The only response that ever contains the token (ADR-0013).</summary>
-public sealed record AgentTokenIssued(Guid Id, string Name, string Token, DateTimeOffset CreatedAt);
+public sealed record AgentTokenIssued(Guid Id, string Name, [property: Secret] string Token, DateTimeOffset CreatedAt);
+
+/// <summary>An agent credential as the audit log records it (AUT-11): never the token or its hash.</summary>
+public sealed record AgentTokenAudit(Guid Id, Guid HostGroupId, string Name, DateTimeOffset? RevokedAt);
 
 public sealed record AgentTokenSummary(Guid Id, string Name, DateTimeOffset CreatedAt, DateTimeOffset? RevokedAt);
 
@@ -43,6 +48,7 @@ public static partial class HostGroupEndpoints
             SetPausedAsync(id, true, db, http, loggers, ct)).RequireAuthorization(BatonRoles.Operator);
         groups.MapPost("/{id:guid}/resume", (Guid id, BatonDbContext db, HttpContext http, ILoggerFactory loggers, CancellationToken ct) =>
             SetPausedAsync(id, false, db, http, loggers, ct)).RequireAuthorization(BatonRoles.Operator);
+        // Every change below writes an audit entry in its own transaction (AUT-11, M7 design.md decision 13).
 
         groups.MapGet("/{id:guid}/agent-tokens", ListTokensAsync).RequireAuthorization(BatonRoles.Admin);
         groups.MapPost("/{id:guid}/agent-tokens", IssueTokenAsync).RequireAuthorization(BatonRoles.Admin);
@@ -60,7 +66,7 @@ public static partial class HostGroupEndpoints
     }
 
     private static async Task<Results<Created<HostGroupResponse>, ValidationProblem, Conflict<ProblemDetails>>> CreateAsync(
-        HostGroupRequest request, BatonDbContext db, CancellationToken ct)
+        HostGroupRequest request, BatonDbContext db, ClaimsPrincipal user, CancellationToken ct)
     {
         var errors = Validate(request);
         if (errors.Count > 0)
@@ -69,6 +75,7 @@ public static partial class HostGroupEndpoints
         var group = new HostGroupEntity { Id = Guid.CreateVersion7(), Name = request.Name! };
         Apply(group, request);
         db.HostGroups.Add(group);
+        AuditWriter.Add(db, user, AuditEntities.HostGroup, group.Id.ToString(), AuditActions.Create, null, ToResponse(group));
 
         if (!await SaveWithLimitsAsync(db, group, ct))
             return DuplicateName(request.Name!);
@@ -77,7 +84,7 @@ public static partial class HostGroupEndpoints
     }
 
     private static async Task<Results<Ok<HostGroupResponse>, NotFound, ValidationProblem, Conflict<ProblemDetails>>> UpdateAsync(
-        Guid id, HostGroupRequest request, BatonDbContext db, CancellationToken ct)
+        Guid id, HostGroupRequest request, BatonDbContext db, ClaimsPrincipal user, CancellationToken ct)
     {
         var errors = Validate(request);
         if (errors.Count > 0)
@@ -87,8 +94,11 @@ public static partial class HostGroupEndpoints
         if (group is null)
             return TypedResults.NotFound();
 
+        var before = AuditWriter.Snapshot(ToResponse(group));
         group.Name = request.Name!;
         Apply(group, request);
+        AuditWriter.AddSnapshots(db, user, AuditEntities.HostGroup, id.ToString(), AuditActions.Update, before,
+            AuditWriter.Snapshot(ToResponse(group)));
 
         if (!await SaveWithLimitsAsync(db, group, ct))
             return DuplicateName(request.Name!);
@@ -97,7 +107,7 @@ public static partial class HostGroupEndpoints
     }
 
     private static async Task<Results<NoContent, NotFound, Conflict<ProblemDetails>>> DeleteAsync(
-        Guid id, BatonDbContext db, CancellationToken ct)
+        Guid id, BatonDbContext db, ClaimsPrincipal user, CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
 
@@ -113,6 +123,7 @@ public static partial class HostGroupEndpoints
 
         // Credentials go with the group (ON DELETE CASCADE); runs that used it still reference it.
         db.HostGroups.Remove(group);
+        AuditWriter.Add(db, user, AuditEntities.HostGroup, id.ToString(), AuditActions.Delete, ToResponse(group), null);
         try
         {
             await db.SaveChangesAsync(ct);
@@ -140,7 +151,7 @@ public static partial class HostGroupEndpoints
     }
 
     private static async Task<Results<Created<AgentTokenIssued>, NotFound, ValidationProblem, Conflict<ProblemDetails>>> IssueTokenAsync(
-        Guid id, AgentTokenRequest request, BatonDbContext db, CancellationToken ct)
+        Guid id, AgentTokenRequest request, BatonDbContext db, ClaimsPrincipal user, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.Name) || request.Name.Length > MaxTokenNameLength)
         {
@@ -162,6 +173,8 @@ public static partial class HostGroupEndpoints
             TokenHash = AgentToken.Hash(token),
         };
         db.AgentCredentials.Add(credential);
+        AuditWriter.Add(db, user, AuditEntities.AgentCredential, credential.Id.ToString(), AuditActions.Issue, null,
+            new AgentTokenAudit(credential.Id, id, credential.Name, null));
         try
         {
             await db.SaveChangesAsync(ct);
@@ -178,14 +191,25 @@ public static partial class HostGroupEndpoints
     }
 
     /// <summary>Revocation is immediate: agents are checked against the database on every call.</summary>
-    private static async Task<Results<NoContent, NotFound>> RevokeTokenAsync(Guid id, Guid tokenId, BatonDbContext db, CancellationToken ct)
+    private static async Task<Results<NoContent, NotFound>> RevokeTokenAsync(
+        Guid id, Guid tokenId, BatonDbContext db, ClaimsPrincipal user, CancellationToken ct)
     {
-        var found = await db.AgentCredentials.Where(c => c.Id == tokenId && c.HostGroupId == id).AnyAsync(ct);
-        if (!found)
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var credential = await db.AgentCredentials.AsNoTracking().SingleOrDefaultAsync(c => c.Id == tokenId && c.HostGroupId == id, ct);
+        if (credential is null)
             return TypedResults.NotFound();
 
-        await db.Database.ExecuteSqlAsync(
+        var revoked = await db.Database.ExecuteSqlAsync(
             $"UPDATE agent_credentials SET revoked_at = now() WHERE id = {tokenId} AND revoked_at IS NULL", ct);
+        if (revoked > 0)
+        {
+            var revokedAt = await db.AgentCredentials.AsNoTracking().Where(c => c.Id == tokenId).Select(c => c.RevokedAt).SingleAsync(ct);
+            AuditWriter.Add(db, user, AuditEntities.AgentCredential, tokenId.ToString(), AuditActions.Revoke,
+                new AgentTokenAudit(tokenId, id, credential.Name, null), new AgentTokenAudit(tokenId, id, credential.Name, revokedAt));
+            await db.SaveChangesAsync(ct);
+        }
+
+        await transaction.CommitAsync(ct);
         return TypedResults.NoContent();
     }
 
@@ -245,7 +269,10 @@ public static partial class HostGroupEndpoints
 
         if (group.DispatchPaused != paused)
         {
+            var before = AuditWriter.Snapshot(ToResponse(group));
             group.DispatchPaused = paused;
+            AuditWriter.AddSnapshots(db, http.User, AuditEntities.HostGroup, id.ToString(),
+                paused ? AuditActions.Pause : AuditActions.Resume, before, AuditWriter.Snapshot(ToResponse(group)));
             await db.SaveChangesAsync(ct);
             if (!paused)
                 await db.Database.ExecuteSqlAsync($"SELECT pg_notify({DbNames.TasksReadyChannel}, {id.ToString()})", ct);
@@ -253,7 +280,7 @@ public static partial class HostGroupEndpoints
             var logger = loggers.CreateLogger(typeof(HostGroupEndpoints));
             if (logger.IsEnabled(LogLevel.Information))
             {
-                var by = http.User.FindFirst("name")?.Value ?? http.User.FindFirst("sub")?.Value ?? "unknown";
+                var by = Actor.From(http.User).Name;
                 LogDispatchPaused(logger, group.Name, paused, by);
             }
         }

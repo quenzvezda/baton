@@ -1,3 +1,4 @@
+using Baton.ControlPlane.Api.Audit;
 using Baton.ControlPlane.Api.Automations;
 using Baton.ControlPlane.Api.Hosts;
 using Baton.ControlPlane.Api.Runs;
@@ -37,6 +38,7 @@ public static class ControlPlane
         app.MapCronPreview();
         app.MapWebhooks();
         app.MapRuns();
+        app.MapAudit();
         return app;
     }
 }
