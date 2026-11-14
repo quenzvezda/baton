@@ -35,5 +35,14 @@ services:
     volumes:
       - ./deploy/keycloak/baton-realm.json:/opt/keycloak/data/import/baton-realm.json:ro
 
+  # Development mail server for run notifications (OBS-05, ADR-0019): SMTP on 1025, web UI on
+  # http://localhost:8025. Accepts every message and delivers none — dev only.
+  mailpit:
+    image: axllent/mailpit:v1.27
+    container_name: baton-mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
 volumes:
   baton-pgdata:

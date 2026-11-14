@@ -14,8 +14,7 @@
     <h2>Host groups</h2>
     <table class="grid" data-groups>
         <thead>
-            <tr><th>Group</th><th>Dispatch</th><th>Hosts</th>
-                @if (_canOperate) { <th><span class="visually-hidden">Actions</span></th> }</tr>
+            <tr><th>Group</th><th>Dispatch</th><th>Hosts</th><th><span class="visually-hidden">Actions</span></th></tr>
         </thead>
         <tbody>
             @foreach (var group in _groups)
@@ -24,9 +23,10 @@
                     <td>@group.Name</td>
                     <td><StatusBadge Status="@(group.DispatchPaused ? "paused" : "dispatching")" /></td>
                     <td>@(_hosts?.Count(h => h.HostGroupId == group.Id) ?? 0)</td>
-                    @if (_canOperate)
-                    {
-                        <td class="actions">
+                    <td class="actions">
+                        <a href="@($"host-groups/{group.Id}/history")">History</a>
+                        @if (_canOperate)
+                        {
                             @if (group.DispatchPaused)
                             {
                                 <button type="button" disabled="@_busy" @onclick="() => SetPausedAsync(group, false)">Resume</button>
@@ -35,8 +35,8 @@
                             {
                                 <button type="button" disabled="@_busy" @onclick="() => SetPausedAsync(group, true)">Pause</button>
                             }
-                        </td>
-                    }
+                        }
+                    </td>
                 </tr>
             }
         </tbody>

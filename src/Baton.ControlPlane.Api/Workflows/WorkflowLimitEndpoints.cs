@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using Baton.ControlPlane.Api.Audit;
 using Baton.ControlPlane.Api.Security;
 using Baton.Domain.Automations;
 using Baton.Persistence;
@@ -7,6 +9,9 @@ using Microsoft.EntityFrameworkCore;
 namespace Baton.ControlPlane.Api.Workflows;
 
 public sealed record WorkflowLimitRequest(int? MaxConcurrentRuns);
+
+/// <summary>A workflow limit as the audit log records it (AUT-11): the setting, not the usage that moves on its own.</summary>
+public sealed record WorkflowLimitAudit(string WorkflowKey, int MaxConcurrentRuns);
 
 /// <param name="MaxConcurrentRuns"><c>null</c> = unlimited.</param>
 /// <param name="InUse">Runs of the workflow holding the limit now.</param>
@@ -41,7 +46,7 @@ public static class WorkflowLimitEndpoints
 
     /// <summary>Lowering the limit below what is in use is allowed; new runs wait until it drains.</summary>
     private static async Task<Results<Ok<WorkflowLimitResponse>, NotFound, ValidationProblem>> SetAsync(
-        string key, WorkflowLimitRequest request, BatonDbContext db, CancellationToken ct)
+        string key, WorkflowLimitRequest request, BatonDbContext db, ClaimsPrincipal user, CancellationToken ct)
     {
         if (request.MaxConcurrentRuns is not (>= 1 and <= MaxLimit))
         {
@@ -55,21 +60,41 @@ public static class WorkflowLimitEndpoints
             return TypedResults.NotFound();
 
         var limitKey = AutomationRules.WorkflowLimitKey(key);
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var previous = await db.ConcurrencyLimits.AsNoTracking().Where(l => l.Key == limitKey).Select(l => (int?)l.Max).SingleOrDefaultAsync(ct);
         await db.Database.ExecuteSqlAsync(
             $"INSERT INTO concurrency_limits (key, max) VALUES ({limitKey}, {request.MaxConcurrentRuns.Value}) ON CONFLICT (key) DO UPDATE SET max = EXCLUDED.max",
             ct);
         var row = await db.ConcurrencyLimits.AsNoTracking().SingleAsync(l => l.Key == limitKey, ct);
+        if (previous != row.Max)
+        {
+            AuditWriter.Add(db, user, AuditEntities.WorkflowLimit, key, AuditActions.Set,
+                previous is { } max ? new WorkflowLimitAudit(key, max) : null, new WorkflowLimitAudit(key, row.Max));
+            await db.SaveChangesAsync(ct);
+        }
+
+        await transaction.CommitAsync(ct);
         return TypedResults.Ok(new WorkflowLimitResponse(key, row.Max, row.InUse));
     }
 
     /// <summary>Runs that hold the row keep it until they end; releasing a missing row is a no-op.</summary>
-    private static async Task<Results<NoContent, NotFound>> RemoveAsync(string key, BatonDbContext db, CancellationToken ct)
+    private static async Task<Results<NoContent, NotFound>> RemoveAsync(
+        string key, BatonDbContext db, ClaimsPrincipal user, CancellationToken ct)
     {
         if (!await db.WorkflowDefinitions.AnyAsync(d => d.Key == key, ct))
             return TypedResults.NotFound();
 
         var limitKey = AutomationRules.WorkflowLimitKey(key);
-        await db.ConcurrencyLimits.Where(l => l.Key == limitKey).ExecuteDeleteAsync(ct);
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var previous = await db.ConcurrencyLimits.AsNoTracking().Where(l => l.Key == limitKey).Select(l => (int?)l.Max).SingleOrDefaultAsync(ct);
+        if (previous is { } max)
+        {
+            await db.ConcurrencyLimits.Where(l => l.Key == limitKey).ExecuteDeleteAsync(ct);
+            AuditWriter.Add(db, user, AuditEntities.WorkflowLimit, key, AuditActions.Remove, new WorkflowLimitAudit(key, max), null);
+            await db.SaveChangesAsync(ct);
+        }
+
+        await transaction.CommitAsync(ct);
         return TypedResults.NoContent();
     }
 }

@@ -79,7 +79,8 @@ public sealed record RunDetail(
     DateTimeOffset? StartedAt,
     DateTimeOffset? FinishedAt,
     DateTimeOffset? DeadlineAt,
-    IReadOnlyList<TaskRunView> Tasks);
+    IReadOnlyList<TaskRunView> Tasks,
+    int Reruns = 0);
 
 /// <summary>
 /// Read side of runs for the API and console (OBS-01, OBS-02). Plain SQL: EF does not model the run tables
@@ -122,7 +123,7 @@ public sealed class RunQueries(NpgsqlDataSource dataSource)
         """;
 
     private const string DetailSql = $"""
-        SELECT {RunColumns}, d.graph_hash, d.graph::text, r.parameters::text, r.cancel_reason, r.blocked_on, r.deadline_at
+        SELECT {RunColumns}, d.graph_hash, d.graph::text, r.parameters::text, r.cancel_reason, r.blocked_on, r.deadline_at, r.reruns
         {RunJoins}
         WHERE r.id = @runId;
 
@@ -189,6 +190,7 @@ public sealed class RunQueries(NpgsqlDataSource dataSource)
         var cancelReason = reader.IsDBNull(16) ? null : reader.GetString(16);
         var blockedOn = reader.IsDBNull(17) ? null : reader.GetString(17);
         var deadlineAt = NullableTime(reader, 18);
+        var reruns = reader.GetInt32(19);
 
         await reader.NextResultAsync(ct);
         var tasks = new List<(Guid Id, TaskRunView View)>();
@@ -230,7 +232,8 @@ public sealed class RunQueries(NpgsqlDataSource dataSource)
             run.Id, run.AutomationId, run.AutomationName, run.WorkflowKey, run.WorkflowVersion, graphHash, graph,
             run.Status, run.Priority, run.HostGroupId, run.HostGroupName, run.TriggerKind, parameters, cancelReason,
             blockedOn, run.CreatedAt, run.StartedAt, run.FinishedAt, deadlineAt,
-            [.. tasks.Select(t => t.View with { Attempts = attempts.TryGetValue(t.Id, out var a) ? a : [] })]);
+            [.. tasks.Select(t => t.View with { Attempts = attempts.TryGetValue(t.Id, out var a) ? a : [] })],
+            reruns);
     }
 
     private static RunSummary ReadSummary(NpgsqlDataReader reader) => new(

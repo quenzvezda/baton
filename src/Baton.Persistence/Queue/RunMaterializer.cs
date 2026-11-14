@@ -125,4 +125,80 @@ public sealed class RunMaterializer(NpgsqlDataSource dataSource, DefinitionGraph
         batch.BatchCommands.Add(RunEvents.NotifyTasksReady(hostGroupId));
         await batch.ExecuteNonQueryAsync(ct);
     }
+
+    // Task rows after the run row, in key order: the finisher's run -> task order (M7 design.md decision 10).
+    private const string LockTasksSql = """
+        SELECT id, task_key, status, attempt FROM task_runs
+        WHERE workflow_run_id = @runId
+        ORDER BY task_key
+        FOR UPDATE
+        """;
+
+    private const string RearmTaskSql = """
+        UPDATE task_runs SET
+          status = @status, upstream_remaining = @remaining, upstream_failed = @failed, upstream_unsuccessful = @unsuccessful,
+          max_attempts = attempt + @maxAttempts, effective_priority = priority,
+          queued_at = CASE WHEN @status = 'queued' THEN now() END,
+          finished_at = CASE WHEN @status = 'skipped' THEN now() END,
+          started_at = NULL, not_before = NULL, output = NULL, error = NULL,
+          lease_host_id = NULL, lease_token = NULL, lease_expires_at = NULL, leased_at = NULL,
+          cancel_requested = false, cancel_requested_at = NULL
+        WHERE id = @id
+        """;
+
+    /// <summary>
+    /// Re-arms the tasks of a re-run run that admission just started (WF-10, design.md decision 10), in admission's
+    /// transaction: <see cref="RerunPlan"/> picks the tasks that run again and their initial state; each gets its
+    /// definition's full retry budget on top of the attempts it already made, its base priority and cleared
+    /// output, error and lease. Succeeded and kept Skipped tasks are not written, so their outputs feed the
+    /// re-armed tasks through the usual lease query. Wakes the group's claimers on commit.
+    /// </summary>
+    /// <returns>Whether any task is left to run; when not, the caller finalizes the run.</returns>
+    public async Task<bool> RearmTasksAsync(
+        NpgsqlConnection connection, NpgsqlTransaction transaction, Guid runId, string definitionHash, Guid hostGroupId,
+        CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+
+        var rows = new Dictionary<string, (Guid Id, int Attempt)>(StringComparer.Ordinal);
+        var statuses = new Dictionary<string, TaskRunStatus>(StringComparer.Ordinal);
+        await using (var lockTasks = new NpgsqlCommand(LockTasksSql, connection, transaction))
+        {
+            lockTasks.Parameters.AddWithValue("runId", runId);
+            await using var reader = await lockTasks.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct))
+            {
+                var key = reader.GetString(1);
+                rows[key] = (reader.GetGuid(0), reader.GetInt32(3));
+                statuses[key] = DbNames.TaskStatus(reader.GetString(2));
+            }
+        }
+
+        var graph = await graphs.GetAsync(definitionHash, ct);
+        var plan = RerunPlan.Plan(graph, statuses);
+        await using var batch = new NpgsqlBatch(connection, transaction);
+        var anyLeft = false;
+        foreach (var task in plan)
+        {
+            var (id, attempt) = rows[task.Key];
+            var command = new NpgsqlBatchCommand(RearmTaskSql);
+            command.Parameters.AddWithValue("id", id);
+            command.Parameters.AddWithValue("status", DbNames.Status(task.Status));
+            command.Parameters.AddWithValue("remaining", task.UpstreamRemaining);
+            command.Parameters.AddWithValue("failed", task.UpstreamFailed);
+            command.Parameters.AddWithValue("unsuccessful", task.UpstreamUnsuccessful);
+            command.Parameters.AddWithValue("maxAttempts", graph[task.Key].Retry.MaxAttempts);
+            batch.BatchCommands.Add(command);
+
+            if (task.Status == TaskRunStatus.Queued)
+                batch.BatchCommands.Add(RunEvents.Command(runId, task.Key, RunEventTypes.TaskQueued, new { attempt = attempt + 1, rerun = true }));
+            else if (task.Status == TaskRunStatus.Skipped)
+                batch.BatchCommands.Add(RunEvents.Command(runId, task.Key, RunEventTypes.TaskSkipped, new { rerun = true }));
+            anyLeft |= task.Status is TaskRunStatus.Queued or TaskRunStatus.Waiting;
+        }
+
+        batch.BatchCommands.Add(RunEvents.NotifyTasksReady(hostGroupId));
+        await batch.ExecuteNonQueryAsync(ct);
+        return anyLeft;
+    }
 }

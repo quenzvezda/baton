@@ -28,6 +28,53 @@ public sealed class TriggerDraft
     }
 }
 
+/// <summary>
+/// A notification channel as edited (OBS-05); <see cref="Id"/> keeps an existing channel on save. A webhook's URL is
+/// write-only: <see cref="Url"/> starts empty and stays <c>null</c> in the request unless a new one is typed.
+/// </summary>
+public sealed class NotificationDraft
+{
+    public const string Email = "email";
+    public const string Webhook = "webhook";
+
+    public Guid? Id { get; set; }
+    public string Kind { get; set; } = Email;
+    public bool OnFailed { get; set; } = true;
+    public bool OnTimedOut { get; set; }
+
+    /// <summary>Email only: addresses separated by commas, semicolons or new lines.</summary>
+    public string? Recipients { get; set; }
+
+    /// <summary>Webhook only: a new URL; empty keeps the stored one.</summary>
+    public string? Url { get; set; }
+
+    /// <summary>An existing webhook channel's stored URL as the API shows it: <c>scheme://host</c> only.</summary>
+    public string? CurrentHost { get; set; }
+
+    public static NotificationDraft From(NotificationInfo channel)
+    {
+        ArgumentNullException.ThrowIfNull(channel);
+        return new NotificationDraft
+        {
+            Id = channel.Id,
+            Kind = channel.Kind,
+            OnFailed = channel.On.Contains("failed"),
+            OnTimedOut = channel.On.Contains("timed_out"),
+            Recipients = channel.Recipients is { } to ? string.Join(", ", to) : null,
+            CurrentHost = channel.Url,
+        };
+    }
+
+    private static readonly char[] Separators = [',', ';', '\n', '\r'];
+
+    public NotificationRequest ToRequest() => new(
+        Id,
+        Kind,
+        [.. new[] { OnFailed ? "failed" : null, OnTimedOut ? "timed_out" : null }.OfType<string>()],
+        Kind == Email ? [.. (Recipients ?? "").Split(Separators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)] : null,
+        Kind == Webhook && !string.IsNullOrWhiteSpace(Url) ? Url.Trim() : null);
+}
+
 /// <summary>The automation editor's inputs as text, so a rejected save keeps what was typed (AUT-03).</summary>
 public sealed class AutomationDraft
 {
@@ -35,7 +82,7 @@ public sealed class AutomationDraft
     public static readonly IReadOnlySet<string> Fields = new HashSet<string>(StringComparer.Ordinal)
     {
         "name", "description", "workflowKey", "workflowVersion", "hostGroupId", "priority", "maxConcurrentRuns",
-        "concurrencyPolicy", "runTimeout", "requiredLabels", "triggers", "placementMode",
+        "concurrencyPolicy", "runTimeout", "requiredLabels", "triggers", "placementMode", "notifications",
     };
 
     public string Name { get; set; } = "";
@@ -54,6 +101,9 @@ public sealed class AutomationDraft
     public string PlacementMode { get; set; } = "per_task";
 
     public List<TriggerDraft> Triggers { get; } = [];
+
+    /// <summary>OBS-05; always sent, since channels left out of a save are removed.</summary>
+    public List<NotificationDraft> Notifications { get; } = [];
 
     public void Load(Automation automation)
     {
@@ -82,6 +132,8 @@ public sealed class AutomationDraft
             MisfirePolicy = t.MisfirePolicy ?? "fire_once",
             CatchUpLimit = t.CatchUpLimit,
         }));
+        Notifications.Clear();
+        Notifications.AddRange((automation.Notifications ?? []).Select(NotificationDraft.From));
     }
 
     /// <summary>The request body; fails only on text the API could not even read (the API validates the rest).</summary>
@@ -121,7 +173,8 @@ public sealed class AutomationDraft
             MaxConcurrentRuns,
             ConcurrencyPolicy,
             timeout,
-            PlacementMode);
+            PlacementMode,
+            [.. Notifications.Select(n => n.ToRequest())]);
         return errors.Count == 0;
     }
 }

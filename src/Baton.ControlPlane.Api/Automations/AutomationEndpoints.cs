@@ -1,14 +1,18 @@
 using System.Globalization;
 using System.Security.Claims;
 using System.Text.Json;
+using Baton.ControlPlane.Api.Audit;
 using Baton.ControlPlane.Api.Security;
 using Baton.Domain.Automations;
+using Baton.Domain.Notifications;
 using Baton.Persistence;
 using Baton.Persistence.Entities;
 using Baton.Persistence.Queue;
+using Baton.Persistence.Security;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Npgsql;
 
 namespace Baton.ControlPlane.Api.Automations;
@@ -36,7 +40,8 @@ public sealed record AutomationRequest(
     int? MaxConcurrentRuns = null,
     string? ConcurrencyPolicy = null,
     TimeSpan? RunTimeout = null,
-    string? PlacementMode = null);
+    string? PlacementMode = null,
+    NotificationRequest[]? Notifications = null);
 
 /// <param name="WebhookUrl">Where a webhook trigger receives deliveries.</param>
 /// <param name="WebhookSecret">Only in the response that issued it (create, clone, rotate-secret).</param>
@@ -49,7 +54,7 @@ public sealed record TriggerResponse(
     DateTimeOffset? NextFireAt,
     DateTimeOffset? LastFiredAt,
     string? WebhookUrl,
-    string? WebhookSecret,
+    [property: Secret] string? WebhookSecret,
     string? MisfirePolicy,
     int? CatchUpLimit);
 
@@ -72,13 +77,14 @@ public sealed record AutomationResponse(
     DateTimeOffset UpdatedAt,
     int Version,
     TriggerResponse[] Triggers,
-    string PlacementMode);
+    string PlacementMode,
+    NotificationResponse[] Notifications);
 
 public sealed record CloneRequest(string? Name);
 
 public sealed record RunAccepted(Guid RunId);
 
-public sealed record SecretRotated(Guid TriggerId, string WebhookSecret);
+public sealed record SecretRotated(Guid TriggerId, [property: Secret] string WebhookSecret);
 
 /// <summary>
 /// Automations (AUT-01..AUT-09) and Run now (AUT-04). Viewers read; Operators change, clone, enable, disable,
@@ -89,6 +95,9 @@ public static class AutomationEndpoints
 {
     private const int MaxIdempotencyKeyLength = 200;
 
+    /// <summary>On a clone's response: how many webhook notification channels were left out (OBS-05, design.md decision 16).</summary>
+    public const string DroppedWebhookChannelsHeader = "Baton-Dropped-Webhook-Channels";
+
     public static IEndpointRouteBuilder MapAutomations(this IEndpointRouteBuilder app)
     {
         var automations = app.MapGroup("/api/automations");
@@ -98,12 +107,14 @@ public static class AutomationEndpoints
         automations.MapPut("/{id:guid}", UpdateAsync).RequireAuthorization(BatonRoles.Operator);
         automations.MapDelete("/{id:guid}", DeleteAsync).RequireAuthorization(BatonRoles.Operator);
         automations.MapPost("/{id:guid}/clone", CloneAsync).RequireAuthorization(BatonRoles.Operator);
-        automations.MapPost("/{id:guid}/enable", (Guid id, BatonDbContext db, HttpResponse response, CancellationToken ct) =>
-            SetEnabledAsync(id, true, db, response, ct)).RequireAuthorization(BatonRoles.Operator);
-        automations.MapPost("/{id:guid}/disable", (Guid id, BatonDbContext db, HttpResponse response, CancellationToken ct) =>
-            SetEnabledAsync(id, false, db, response, ct)).RequireAuthorization(BatonRoles.Operator);
+        automations.MapPost("/{id:guid}/enable", (Guid id, BatonDbContext db, ClaimsPrincipal user, HttpResponse response, CancellationToken ct) =>
+            SetEnabledAsync(id, true, db, user, response, ct)).RequireAuthorization(BatonRoles.Operator);
+        automations.MapPost("/{id:guid}/disable", (Guid id, BatonDbContext db, ClaimsPrincipal user, HttpResponse response, CancellationToken ct) =>
+            SetEnabledAsync(id, false, db, user, response, ct)).RequireAuthorization(BatonRoles.Operator);
         automations.MapPost("/{id:guid}/runs", RunNowAsync).RequireAuthorization(BatonRoles.Operator);
         automations.MapPost("/{id:guid}/triggers/{triggerId:guid}/rotate-secret", RotateSecretAsync).RequireAuthorization(BatonRoles.Operator);
+        automations.MapPost("/{id:guid}/notifications/{channelId:guid}/rotate-secret", RotateSigningSecretAsync)
+            .RequireAuthorization(BatonRoles.Operator);
         return app;
     }
 
@@ -113,7 +124,9 @@ public static class AutomationEndpoints
         var ids = automations.Select(a => a.Id).ToList();
         var triggers = await db.AutomationTriggers.AsNoTracking().Where(t => ids.Contains(t.AutomationId)).ToListAsync(ct);
         var byAutomation = triggers.ToLookup(t => t.AutomationId);
-        return TypedResults.Ok(automations.Select(a => ToResponse(a, byAutomation[a.Id], null)).ToArray());
+        var channels = (await db.NotificationChannels.AsNoTracking().Where(c => ids.Contains(c.AutomationId)).ToListAsync(ct))
+            .ToLookup(c => c.AutomationId);
+        return TypedResults.Ok(automations.Select(a => ToResponse(a, byAutomation[a.Id], channels[a.Id], null)).ToArray());
     }
 
     private static async Task<Results<Ok<AutomationResponse>, NotFound>> GetAsync(
@@ -124,15 +137,20 @@ public static class AutomationEndpoints
             return TypedResults.NotFound();
 
         var triggers = await db.AutomationTriggers.AsNoTracking().Where(t => t.AutomationId == id).ToListAsync(ct);
-        return Ok(response, ToResponse(automation, triggers, null));
+        return Ok(response, ToResponse(automation, triggers, await NotificationChannels.LoadAsync(db, id, ct), null));
     }
 
     private static async Task<Results<Created<AutomationResponse>, ValidationProblem, Conflict<ProblemDetails>>> CreateAsync(
-        AutomationRequest request, BatonDbContext db, WebhookSecrets secrets, ClaimsPrincipal user, HttpResponse response,
-        CancellationToken ct)
+        AutomationRequest request, BatonDbContext db, WebhookSecrets secrets, NotificationSecrets notificationSecrets,
+        IOptions<NotificationPolicy> policy, ClaimsPrincipal user, HttpResponse response, CancellationToken ct)
     {
         var owner = string.IsNullOrWhiteSpace(request.Owner) ? CallerName(user) : request.Owner;
-        var errors = await ValidateAsync(request, owner, db, ct);
+        var errors = await ValidateAsync(request, owner, policy.Value, db, ct);
+        foreach (var (i, channel) in (request.Notifications ?? []).Index())
+        {
+            if (channel?.Id is not null)
+                errors[$"notifications[{i}].id"] = ["Leave the id out to add a channel."];
+        }
         if (errors.Count > 0)
             return TypedResults.ValidationProblem(errors);
 
@@ -154,21 +172,24 @@ public static class AutomationEndpoints
         foreach (var trigger in request.Triggers!)
             db.AutomationTriggers.Add(NewTrigger(automation.Id, trigger.Kind!, trigger.CronExpression, trigger.TimeZone, trigger.Enabled ?? true, now, secrets, issued,
                 trigger.MisfirePolicy, trigger.CatchUpLimit));
+        NotificationChannels.Apply(db, automation.Id, request.Notifications ?? [], [], notificationSecrets, issued);
 
         if (!await SaveAsync(db, ct))
             return DuplicateName(automation.Name);
 
         await SetLimitAsync(db, automation, ct);
+        var triggers = await db.AutomationTriggers.AsNoTracking().Where(t => t.AutomationId == automation.Id).ToListAsync(ct);
+        var channels = await NotificationChannels.LoadAsync(db, automation.Id, ct);
+        await AuditAsync(db, user, automation.Id, AuditActions.Create, null, ToResponse(automation, triggers, channels, null), ct);
         await transaction.CommitAsync(ct);
 
-        var triggers = await db.AutomationTriggers.AsNoTracking().Where(t => t.AutomationId == automation.Id).ToListAsync(ct);
         SetETag(response, automation.RowVersion);
-        return TypedResults.Created($"/api/automations/{automation.Id}", ToResponse(automation, triggers, issued));
+        return TypedResults.Created($"/api/automations/{automation.Id}", ToResponse(automation, triggers, channels, issued));
     }
 
     private static async Task<Results<Ok<AutomationResponse>, NotFound, ValidationProblem, Conflict<ProblemDetails>, ProblemHttpResult>> UpdateAsync(
-        Guid id, AutomationRequest request, BatonDbContext db, WebhookSecrets secrets, HttpRequest http, HttpResponse response,
-        CancellationToken ct)
+        Guid id, AutomationRequest request, BatonDbContext db, WebhookSecrets secrets, NotificationSecrets notificationSecrets,
+        IOptions<NotificationPolicy> policy, ClaimsPrincipal user, HttpRequest http, HttpResponse response, CancellationToken ct)
     {
         if (!TryReadIfMatch(http, out var expectedVersion))
         {
@@ -184,12 +205,15 @@ public static class AutomationEndpoints
             return Stale();
 
         var owner = string.IsNullOrWhiteSpace(request.Owner) ? automation.Owner : request.Owner;
-        var errors = await ValidateAsync(request, owner, db, ct);
+        var errors = await ValidateAsync(request, owner, policy.Value, db, ct);
         var existing = await db.AutomationTriggers.Where(t => t.AutomationId == id).ToListAsync(ct);
         ValidateTriggerIds(request.Triggers ?? [], existing, errors);
+        var existingChannels = await db.NotificationChannels.Where(c => c.AutomationId == id).ToListAsync(ct);
+        NotificationChannels.ValidateIds(request.Notifications ?? [], existingChannels, errors);
         if (errors.Count > 0)
             return TypedResults.ValidationProblem(errors);
 
+        var before = AuditWriter.Snapshot(ToResponse(automation, existing, existingChannels, null));
         var now = await DbNowAsync(db, ct);
         var wasEnabled = automation.Enabled;
         automation.Name = request.Name!.Trim();
@@ -223,6 +247,10 @@ public static class AutomationEndpoints
         }
 
         db.AutomationTriggers.RemoveRange(existing.Where(t => !kept.Contains(t.Id)));
+        // Absent notifications keep the channels, so clients older than M7 do not drop them on save; [] removes them all.
+        var changedUrls = request.Notifications is { } notifications
+            ? NotificationChannels.Apply(db, id, notifications, existingChannels, notificationSecrets, issued)
+            : [];
 
         try
         {
@@ -235,15 +263,20 @@ public static class AutomationEndpoints
         }
 
         await SetLimitAsync(db, automation, ct);
+        var triggers = await db.AutomationTriggers.AsNoTracking().Where(t => t.AutomationId == id).ToListAsync(ct);
+        var channels = await NotificationChannels.LoadAsync(db, id, ct);
+        var after = ToResponse(automation, triggers, channels, null);
+        AuditWriter.AddSnapshots(db, user, AuditEntities.Automation, id.ToString(), AuditActions.Update, before,
+            changedUrls.Count == 0 ? AuditWriter.Snapshot(after) : AuditWriter.Snapshot(after, ("changedWebhookUrls", changedUrls)));
+        await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
 
-        var triggers = await db.AutomationTriggers.AsNoTracking().Where(t => t.AutomationId == id).ToListAsync(ct);
-        return Ok(response, ToResponse(automation, triggers, issued));
+        return Ok(response, ToResponse(automation, triggers, channels, issued));
     }
 
     /// <summary>Soft delete (design.md decision 5): triggers stop, runs carry on, the name becomes free.</summary>
     private static async Task<Results<NoContent, NotFound, ProblemHttpResult>> DeleteAsync(
-        Guid id, BatonDbContext db, HttpRequest http, CancellationToken ct)
+        Guid id, BatonDbContext db, ClaimsPrincipal user, HttpRequest http, CancellationToken ct)
     {
         var automation = await db.Automations.SingleOrDefaultAsync(a => a.Id == id && a.DeletedAt == null, ct);
         if (automation is null)
@@ -251,6 +284,9 @@ public static class AutomationEndpoints
         if (http.Headers.IfMatch.Count > 0 && (!TryReadIfMatch(http, out var expected) || expected != automation.RowVersion))
             return Stale();
 
+        var triggers = await db.AutomationTriggers.AsNoTracking().Where(t => t.AutomationId == id).ToListAsync(ct);
+        AuditWriter.Add(db, user, AuditEntities.Automation, id.ToString(), AuditActions.Delete,
+            ToResponse(automation, triggers, await NotificationChannels.LoadAsync(db, id, ct), null), null);
         automation.DeletedAt = await DbNowAsync(db, ct);
         automation.RowVersion++;
         try
@@ -267,7 +303,8 @@ public static class AutomationEndpoints
 
     /// <summary>AUT-01 "Clone": the same settings and triggers under a new name, disabled; webhook triggers get new secrets.</summary>
     private static async Task<Results<Created<AutomationResponse>, NotFound, ValidationProblem, Conflict<ProblemDetails>>> CloneAsync(
-        Guid id, CloneRequest request, BatonDbContext db, WebhookSecrets secrets, HttpResponse response, CancellationToken ct)
+        Guid id, CloneRequest request, BatonDbContext db, WebhookSecrets secrets, ClaimsPrincipal user, HttpResponse response,
+        CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.Name) || request.Name.Trim().Length > AutomationRules.MaxNameLength)
             return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["name"] = [$"Required, at most {AutomationRules.MaxNameLength} characters."] });
@@ -304,21 +341,26 @@ public static class AutomationEndpoints
         foreach (var trigger in sourceTriggers)
             db.AutomationTriggers.Add(NewTrigger(clone.Id, trigger.Kind, trigger.CronExpr, trigger.TimeZone, trigger.Enabled, now, secrets, issued,
                 trigger.MisfirePolicy, trigger.CatchUpLimit));
+        var dropped = NotificationChannels.CopyForClone(db, clone.Id, await NotificationChannels.LoadAsync(db, id, ct));
 
         if (!await SaveAsync(db, ct))
             return DuplicateName(clone.Name);
 
         await SetLimitAsync(db, clone, ct);
+        var triggers = await db.AutomationTriggers.AsNoTracking().Where(t => t.AutomationId == clone.Id).ToListAsync(ct);
+        var channels = await NotificationChannels.LoadAsync(db, clone.Id, ct);
+        await AuditAsync(db, user, clone.Id, AuditActions.Clone, null, ToResponse(clone, triggers, channels, null), ct);
         await transaction.CommitAsync(ct);
 
-        var triggers = await db.AutomationTriggers.AsNoTracking().Where(t => t.AutomationId == clone.Id).ToListAsync(ct);
         SetETag(response, clone.RowVersion);
-        return TypedResults.Created($"/api/automations/{clone.Id}", ToResponse(clone, triggers, issued));
+        if (dropped > 0)
+            response.Headers[DroppedWebhookChannelsHeader] = dropped.ToString(CultureInfo.InvariantCulture);
+        return TypedResults.Created($"/api/automations/{clone.Id}", ToResponse(clone, triggers, channels, issued));
     }
 
     /// <summary>Enabling recomputes every cron trigger's next fire time from now, so missed times do not fire.</summary>
     private static async Task<Results<Ok<AutomationResponse>, NotFound, ProblemHttpResult>> SetEnabledAsync(
-        Guid id, bool enabled, BatonDbContext db, HttpResponse response, CancellationToken ct)
+        Guid id, bool enabled, BatonDbContext db, ClaimsPrincipal user, HttpResponse response, CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var automation = await db.Automations.SingleOrDefaultAsync(a => a.Id == id && a.DeletedAt == null, ct);
@@ -326,8 +368,10 @@ public static class AutomationEndpoints
             return TypedResults.NotFound();
 
         var triggers = await db.AutomationTriggers.Where(t => t.AutomationId == id).ToListAsync(ct);
+        var channels = await NotificationChannels.LoadAsync(db, id, ct);
         if (automation.Enabled != enabled)
         {
+            var before = AuditWriter.Snapshot(ToResponse(automation, triggers, channels, null));
             var now = await DbNowAsync(db, ct);
             automation.Enabled = enabled;
             automation.UpdatedAt = now;
@@ -338,6 +382,8 @@ public static class AutomationEndpoints
                     trigger.NextFireAt = NextFire(trigger, now);
             }
 
+            AuditWriter.AddSnapshots(db, user, AuditEntities.Automation, id.ToString(),
+                enabled ? AuditActions.Enable : AuditActions.Disable, before, AuditWriter.Snapshot(ToResponse(automation, triggers, channels, null)));
             try
             {
                 await db.SaveChangesAsync(ct);
@@ -349,7 +395,7 @@ public static class AutomationEndpoints
         }
 
         await transaction.CommitAsync(ct);
-        return Ok(response, ToResponse(automation, triggers, null));
+        return Ok(response, ToResponse(automation, triggers, channels, null));
     }
 
     /// <summary>
@@ -382,7 +428,7 @@ public static class AutomationEndpoints
     }
 
     private static async Task<Results<Ok<SecretRotated>, NotFound, ProblemHttpResult>> RotateSecretAsync(
-        Guid id, Guid triggerId, BatonDbContext db, WebhookSecrets secrets, CancellationToken ct)
+        Guid id, Guid triggerId, BatonDbContext db, WebhookSecrets secrets, ClaimsPrincipal user, CancellationToken ct)
     {
         var (secret, stored) = secrets.Issue();
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
@@ -395,6 +441,7 @@ public static class AutomationEndpoints
         trigger.WebhookSecret = stored;
         automation.RowVersion++;
         automation.UpdatedAt = await DbNowAsync(db, ct);
+        AuditWriter.Add(db, user, AuditEntities.Automation, id.ToString(), AuditActions.RotateSecret, null, new { triggerId });
         try
         {
             await db.SaveChangesAsync(ct);
@@ -408,8 +455,37 @@ public static class AutomationEndpoints
         return TypedResults.Ok(new SecretRotated(triggerId, secret));
     }
 
+    /// <summary>OBS-05: a new signing secret for a webhook notification channel, returned once.</summary>
+    private static async Task<Results<Ok<SigningSecretRotated>, NotFound, ProblemHttpResult>> RotateSigningSecretAsync(
+        Guid id, Guid channelId, BatonDbContext db, NotificationSecrets secrets, ClaimsPrincipal user, CancellationToken ct)
+    {
+        var (secret, stored) = secrets.IssueSecret();
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var automation = await db.Automations.SingleOrDefaultAsync(a => a.Id == id && a.DeletedAt == null, ct);
+        var channel = await db.NotificationChannels.SingleOrDefaultAsync(
+            c => c.Id == channelId && c.AutomationId == id && c.Kind == NotificationRules.WebhookKind, ct);
+        if (automation is null || channel is null)
+            return TypedResults.NotFound();
+
+        channel.WebhookSecret = stored;
+        automation.RowVersion++;
+        automation.UpdatedAt = await DbNowAsync(db, ct);
+        AuditWriter.Add(db, user, AuditEntities.Automation, id.ToString(), AuditActions.RotateSecret, null, new { channelId });
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Stale();
+        }
+
+        await transaction.CommitAsync(ct);
+        return TypedResults.Ok(new SigningSecretRotated(channelId, secret));
+    }
+
     private static async Task<Dictionary<string, string[]>> ValidateAsync(
-        AutomationRequest request, string owner, BatonDbContext db, CancellationToken ct)
+        AutomationRequest request, string owner, NotificationPolicy policy, BatonDbContext db, CancellationToken ct)
     {
         var settings = new AutomationSettings(
             request.Name, request.Description, owner, request.WorkflowKey, request.WorkflowVersion, request.HostGroupId,
@@ -419,6 +495,8 @@ public static class AutomationEndpoints
             request.Triggers?.Select(t => new TriggerSettings(t?.Kind, t?.CronExpression, t?.TimeZone, t?.MisfirePolicy, t?.CatchUpLimit)).ToList(),
             request.PlacementMode);
         var errors = AutomationRules.Validate(settings);
+        foreach (var (field, messages) in NotificationRules.Validate(NotificationChannels.Settings(request.Notifications), policy))
+            errors[field] = messages;
 
         if (request.HostGroupId is { } groupId && !errors.ContainsKey("hostGroupId")
             && !await db.HostGroups.AnyAsync(g => g.Id == groupId, ct))
@@ -521,6 +599,14 @@ public static class AutomationEndpoints
     private static DateTimeOffset? NextFire(AutomationTriggerEntity trigger, DateTimeOffset now) =>
         CronSchedule.Create(trigger.CronExpr!, trigger.TimeZone!).NextAfter(now);
 
+    /// <summary>Adds the audit entry and saves it in the caller's transaction (AUT-11).</summary>
+    private static async Task AuditAsync(
+        BatonDbContext db, ClaimsPrincipal user, Guid id, string action, object? before, object? after, CancellationToken ct)
+    {
+        AuditWriter.Add(db, user, AuditEntities.Automation, id.ToString(), action, before, after);
+        await db.SaveChangesAsync(ct);
+    }
+
     /// <summary>The <c>automation:{id}</c> row follows <c>max_concurrent_runs</c> (ADR-0009).</summary>
     private static async Task SetLimitAsync(BatonDbContext db, AutomationEntity automation, CancellationToken ct)
     {
@@ -571,7 +657,8 @@ public static class AutomationEndpoints
     }
 
     private static AutomationResponse ToResponse(
-        AutomationEntity a, IEnumerable<AutomationTriggerEntity> triggers, IReadOnlyDictionary<Guid, string>? issuedSecrets) => new(
+        AutomationEntity a, IEnumerable<AutomationTriggerEntity> triggers, IEnumerable<NotificationChannelEntity> channels,
+        IReadOnlyDictionary<Guid, string>? issuedSecrets) => new(
         a.Id,
         a.Name,
         a.Description,
@@ -596,7 +683,8 @@ public static class AutomationEndpoints
                 t.Kind == AutomationRules.CronKind ? t.MisfirePolicy : null,
                 t.CatchUpLimit)),
         ],
-        a.PlacementMode);
+        a.PlacementMode,
+        NotificationChannels.ToResponse(channels, issuedSecrets));
 
     private static ProblemHttpResult Stale() => TypedResults.Problem(statusCode: StatusCodes.Status412PreconditionFailed,
         title: "Automation changed", detail: "The automation changed since you read it; reload it and apply your change again.");

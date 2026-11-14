@@ -1,8 +1,11 @@
 using Baton.Web.Api;
 using Baton.Web.Auth;
 using Baton.Web.Components;
+using Baton.Telemetry;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.AddBatonTelemetry("web").AddBatonAspNetCoreTelemetry();
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();

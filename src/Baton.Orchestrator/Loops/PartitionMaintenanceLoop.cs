@@ -44,7 +44,14 @@ public sealed partial class PartitionMaintenanceLoop(
             metrics.RunsPurged(purged);
             LogRunsPurged(Logger, purged, HistoryRetention.RetentionDays);
         }
+
+        var audited = await HistoryRetention.PurgeAuditAsync(connection, transaction, ct);
+        if (audited > 0)
+            LogAuditPurged(Logger, audited, HistoryRetention.AuditRetentionDays);
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Purged {Count} audit entries older than {Days} days")]
+    private static partial void LogAuditPurged(ILogger logger, int count, int days);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Created {Count} history partitions")]
     private static partial void LogPartitionsCreated(ILogger logger, int count);

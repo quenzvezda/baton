@@ -17,6 +17,42 @@ public static class HistoryRetention
     /// <summary>At most this many runs are purged per call (design.md decision 4).</summary>
     public const int PurgeBatchSize = 5_000;
 
+    /// <summary>Audit entries are kept a year, apart from run history (AUT-11, M7 design.md decision 15).</summary>
+    public const int AuditRetentionDays = 365;
+
+    /// <summary>At most this many audit entries are deleted per statement.</summary>
+    public const int AuditPurgeBatchSize = 10_000;
+
+    private const string PurgeAuditSql = """
+        DELETE FROM audit_log
+        WHERE id IN (
+          SELECT id FROM audit_log
+          WHERE at < now() - make_interval(days => @days)
+          ORDER BY at
+          LIMIT @batch)
+        """;
+
+    /// <summary>
+    /// Deletes every audit entry older than <see cref="AuditRetentionDays"/>, in batches of
+    /// <see cref="AuditPurgeBatchSize"/>, and returns how many were deleted.
+    /// </summary>
+    public static async Task<int> PurgeAuditAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, CancellationToken ct)
+    {
+        var total = 0;
+        int deleted;
+        do
+        {
+            await using var cmd = new NpgsqlCommand(PurgeAuditSql, connection, transaction);
+            cmd.Parameters.AddWithValue("days", AuditRetentionDays);
+            cmd.Parameters.AddWithValue("batch", AuditPurgeBatchSize);
+            deleted = await cmd.ExecuteNonQueryAsync(ct);
+            total += deleted;
+        }
+        while (deleted == AuditPurgeBatchSize);
+
+        return total;
+    }
+
     /// <summary>
     /// Children of the history tables with Baton's naming, with the UTC start of their month. Partitions
     /// with any other name are ignored, so hand-made partitions are never dropped by accident.

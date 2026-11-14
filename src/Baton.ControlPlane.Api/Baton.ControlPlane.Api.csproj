@@ -33,5 +33,7 @@
   <ItemGroup>
     <!-- OpenTelemetry baseline, shared as source (M0 task 3.3) -->
     <Compile Include="../Shared/BatonTelemetry.cs" Link="Shared/BatonTelemetry.cs" />
+    <Compile Include="../Shared/BatonAspNetCoreTelemetry.cs" Link="Shared/BatonAspNetCoreTelemetry.cs" />
+    <Compile Include="../Shared/BatonNpgsqlTelemetry.cs" Link="Shared/BatonNpgsqlTelemetry.cs" />
   </ItemGroup>
 </Project>

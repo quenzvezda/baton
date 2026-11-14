@@ -1,0 +1,31 @@
+@page "/host-groups/{Id:guid}/history"
+@inject IBatonApi Api
+
+<PageTitle>History · @(_name ?? "Host group") · Baton</PageTitle>
+
+<p class="crumbs"><a href="hosts">Hosts</a> / <a href="queue">Queue</a> /</p>
+<h1>History of host group @(_name ?? Id.ToString()[..8])</h1>
+<ErrorMessage Text="@_error" />
+<AuditHistory EntityType="host_group" EntityId="@Id.ToString()" PageSize="PageSize" />
+
+@code {
+    private string? _name;
+    private string? _error;
+
+    [Parameter] public Guid Id { get; set; }
+
+    /// <summary>Entries per page; the API's default when <c>null</c>.</summary>
+    [Parameter] public int? PageSize { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            _name = (await Api.ListHostGroupsAsync()).SingleOrDefault(g => g.Id == Id)?.Name;
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+    }
+}

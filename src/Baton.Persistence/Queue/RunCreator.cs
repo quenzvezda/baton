@@ -65,9 +65,9 @@ public sealed class RunCreator(NpgsqlDataSource dataSource)
 
     private const string InsertRunSql = """
         INSERT INTO workflow_runs (id, automation_id, definition_id, status, priority, host_group_id, parameters, trigger_kind,
-                                   idempotency_key, limit_keys, required_labels, run_timeout, placement_mode)
+                                   idempotency_key, limit_keys, required_labels, run_timeout, placement_mode, trace_parent)
         VALUES (@id, @automationId, @definitionId, 'pending', @priority, @groupId, @parameters, @triggerKind,
-                @idempotencyKey, @limitKeys, @labels, @timeout, @placement)
+                @idempotencyKey, @limitKeys, @labels, @timeout, @placement, @traceParent)
         """;
 
     /// <summary>Fires in a transaction of its own (Run now, webhooks).</summary>
@@ -181,6 +181,8 @@ public sealed class RunCreator(NpgsqlDataSource dataSource)
             insert.Parameters.AddWithValue("labels", automation.RequiredLabels);
             insert.Parameters.AddWithValue("timeout", NpgsqlDbType.Interval, (object?)automation.RunTimeout ?? DBNull.Value);
             insert.Parameters.AddWithValue("placement", automation.PlacementMode); // fixed for the run's life (ORC-12)
+            // OBS-06: the run's trace is the activity that created it (design.md decision 27).
+            insert.Parameters.AddWithValue("traceParent", NpgsqlDbType.Text, (object?)BatonActivities.CurrentTraceParent() ?? DBNull.Value);
             batch.BatchCommands.Add(insert);
             batch.BatchCommands.Add(RunEvents.Command(newRunId, null, RunEventTypes.RunCreated, new
             {

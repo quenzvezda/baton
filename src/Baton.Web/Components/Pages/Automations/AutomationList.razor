@@ -38,6 +38,7 @@ else
                     <td><Moment Value="automation.UpdatedAt" /></td>
                     <td class="actions">
                         <a href="@($"runs?automationId={automation.Id}")">Runs</a>
+                        <a href="@($"automations/{automation.Id}/history")">History</a>
                         @if (_canOperate)
                         {
                             <button type="button" disabled="@(!automation.Enabled || _busy)" @onclick="() => RunNowAsync(automation)">Run now</button>

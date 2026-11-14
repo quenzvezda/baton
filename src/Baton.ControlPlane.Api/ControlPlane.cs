@@ -1,10 +1,13 @@
+using Baton.ControlPlane.Api.Audit;
 using Baton.ControlPlane.Api.Automations;
 using Baton.ControlPlane.Api.Hosts;
+using Baton.ControlPlane.Api.Queue;
 using Baton.ControlPlane.Api.Runs;
 using Baton.ControlPlane.Api.Security;
 using Baton.ControlPlane.Api.Workflows;
+using Baton.Domain.Notifications;
 using Baton.Persistence;
-using Microsoft.AspNetCore.DataProtection;
+using Baton.Persistence.Security;
 
 namespace Baton.ControlPlane.Api;
 
@@ -19,10 +22,9 @@ public static class ControlPlane
         services.AddProblemDetails();
         services.AddBatonSecurity(configuration);
 
-        // Webhook secrets (ADR-0015): one key ring in Postgres for every replica, encrypted at rest with the
-        // certificate named by Baton:DataProtection:CertificatePath when the deployment provides one.
-        services.AddDataProtection().SetApplicationName("baton").PersistKeysToDbContext<BatonDbContext>()
-            .ProtectKeysFromConfiguration(configuration);
+        // Webhook and notification secrets (ADR-0015, ADR-0018): the key ring shared with the orchestrator.
+        services.AddBatonDataProtection(configuration);
+        services.Configure<NotificationPolicy>(configuration.GetSection(NotificationPolicy.Section));
         services.AddSingleton<WebhookSecrets>();
         return services;
     }
@@ -39,6 +41,8 @@ public static class ControlPlane
         app.MapCronPreview();
         app.MapWebhooks();
         app.MapRuns();
+        app.MapAudit();
+        app.MapQueue();
         return app;
     }
 }

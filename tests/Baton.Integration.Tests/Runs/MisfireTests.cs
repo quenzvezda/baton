@@ -19,6 +19,7 @@ public sealed class MisfireTests(PostgresFixture pg)
     public async Task FireOnce_after_an_outage_creates_one_run_for_the_latest_missed_time()
     {
         var s = await RunScenario.CreateAsync(pg, policy: "allow", maxRuns: 10);
+        await DrainDueTriggersAsync();
         var trigger = await TriggerLoopTests.AddCronTriggerAsync(pg, s.AutomationId, Yearly, "UTC", Since2020, "fire_once");
 
         var pass = await new CronTriggers(pg.DataSource).FireDueAsync(CancellationToken.None);
@@ -37,6 +38,7 @@ public sealed class MisfireTests(PostgresFixture pg)
     public async Task Skip_after_an_outage_creates_no_run_and_records_the_miss()
     {
         var s = await RunScenario.CreateAsync(pg, policy: "allow", maxRuns: 10);
+        await DrainDueTriggersAsync();
         var trigger = await TriggerLoopTests.AddCronTriggerAsync(pg, s.AutomationId, Yearly, "UTC", Since2020, "skip");
 
         var pass = await new CronTriggers(pg.DataSource).FireDueAsync(CancellationToken.None);
@@ -52,6 +54,7 @@ public sealed class MisfireTests(PostgresFixture pg)
     public async Task CatchUp_creates_the_3_most_recent_missed_runs()
     {
         var s = await RunScenario.CreateAsync(pg, policy: "allow", maxRuns: 10);
+        await DrainDueTriggersAsync();
         await TriggerLoopTests.AddCronTriggerAsync(pg, s.AutomationId, Yearly, "UTC", Since2020, "catch_up", catchUpLimit: 3);
 
         var pass = await new CronTriggers(pg.DataSource).FireDueAsync(CancellationToken.None);
@@ -67,6 +70,7 @@ public sealed class MisfireTests(PostgresFixture pg)
     public async Task Slightly_late_fire_is_not_a_misfire()
     {
         var s = await RunScenario.CreateAsync(pg, policy: "allow", maxRuns: 10);
+        await DrainDueTriggersAsync();
         await TriggerLoopTests.AddCronTriggerAsync(pg, s.AutomationId, Yearly, "UTC", dueSecondsAgo: 20, misfirePolicy: "skip");
 
         var pass = await new CronTriggers(pg.DataSource).FireDueAsync(CancellationToken.None);
@@ -80,6 +84,7 @@ public sealed class MisfireTests(PostgresFixture pg)
     public async Task Catch_up_runs_follow_the_concurrency_policy()
     {
         var s = await RunScenario.CreateAsync(pg, policy: "skip", maxRuns: 1);
+        await DrainDueTriggersAsync();
         await TriggerLoopTests.AddCronTriggerAsync(pg, s.AutomationId, Yearly, "UTC", Since2020, "catch_up", catchUpLimit: 3);
 
         var pass = await new CronTriggers(pg.DataSource).FireDueAsync(CancellationToken.None);
@@ -89,6 +94,12 @@ public sealed class MisfireTests(PostgresFixture pg)
         Assert.Equal(2L, await HostData.ScalarAsync<long>(pg,
             "SELECT count(*) FROM run_events WHERE workflow_run_id = @id AND type = 'run.skipped'", ("id", s.AutomationId)));
     }
+
+    /// <summary>
+    /// Fires the due triggers other tests in the collection left behind, so the pass totals below count this test's
+    /// trigger only (the trigger pass fires every due trigger in the shared database).
+    /// </summary>
+    private async Task DrainDueTriggersAsync() => await new CronTriggers(pg.DataSource).FireDueAsync(CancellationToken.None);
 
     /// <summary>The fire-time year of each run of the automation, oldest first.</summary>
     private async Task<List<int>> RunYearsAsync(Guid automationId)

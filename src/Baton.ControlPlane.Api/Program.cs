@@ -7,7 +7,7 @@ using Baton.Telemetry;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.AddBatonTelemetry("control-plane-api");
+builder.AddBatonTelemetry("control-plane-api").AddBatonAspNetCoreTelemetry().AddBatonNpgsqlTelemetry();
 builder.Services.AddBatonPersistence(builder.Configuration.GetConnectionString("Baton"));
 builder.Services.AddWorkflows(typeof(DefinitionsAssembly).Assembly);
 builder.Services.AddControlPlane(builder.Configuration);

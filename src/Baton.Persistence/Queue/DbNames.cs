@@ -137,6 +137,16 @@ public static class RunEventTypes
     public const string TaskCancelRequested = "task.cancel_requested";
     public const string TaskCancelled = "task.cancelled";
 
+    // M7 (add-operability-and-insight).
+
+    /// <summary>An Operator re-ran a Failed or TimedOut run; it is Pending again (WF-10).</summary>
+    public const string RunRerunRequested = "run.rerun_requested";
+
+    /// <summary>A notification delivery succeeded / gave up after its last attempt (OBS-05, OQ-08).</summary>
+    public const string NotificationSent = "notification.sent";
+
+    public const string NotificationFailed = "notification.failed";
+
     /// <summary><c>task.succeeded</c>, <c>task.failed</c>, <c>task.timed_out</c>, <c>task.lost</c>, <c>task.cancelled</c>.</summary>
     public static string Attempt(AttemptOutcome outcome) => $"task.{DbNames.Outcome(outcome)}";
 }

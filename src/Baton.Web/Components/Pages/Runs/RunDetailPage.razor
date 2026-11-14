@@ -25,6 +25,10 @@ else
         {
             <button type="button" class="danger" disabled="@_busy" @onclick="CancelAsync">Cancel run</button>
         }
+        @if (_canOperate && _run.Status is "failed" or "timed_out")
+        {
+            <button type="button" class="rerun" disabled="@_busy" @onclick="RerunAsync">Re-run failed tasks</button>
+        }
     </div>
     <dl class="facts">
         <dt>Workflow</dt>
@@ -48,6 +52,11 @@ else
         <dd><Moment Value="_run.StartedAt" /></dd>
         <dt>Finished</dt>
         <dd><Moment Value="_run.FinishedAt" /></dd>
+        @if (_run.Reruns > 0)
+        {
+            <dt>Re-runs</dt>
+            <dd data-reruns>@_run.Reruns</dd>
+        }
         @if (_run.CancelReason is not null)
         {
             <dt>Cancelled by</dt>
@@ -153,9 +162,7 @@ else
     {
         try
         {
-            _run = await Api.GetRunAsync(Id);
-            _notFound = _run is null;
-            _states = _run?.Tasks.ToDictionary(t => t.Key, t => t.Status) ?? [];
+            SetRun(await Api.GetRunAsync(Id));
             _error = null;
         }
         catch (ApiException ex)
@@ -186,6 +193,34 @@ else
         {
             _busy = false;
         }
+    }
+
+    /// <summary>WF-10: resets the failed tasks in place; the run is Pending again and goes through admission.</summary>
+    private async Task RerunAsync()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            SetRun(await Api.RetryFailedRunAsync(Id));
+        }
+        catch (ApiException ex)
+        {
+            // 409: the run changed state meanwhile; show it as it is now, with the reason.
+            await RefreshAsync();
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void SetRun(RunDetail? run)
+    {
+        _run = run;
+        _notFound = run is null;
+        _states = run?.Tasks.ToDictionary(t => t.Key, t => t.Status) ?? [];
     }
 
     private static bool IsFinal(string status) => status is "succeeded" or "failed" or "cancelled" or "timed_out";

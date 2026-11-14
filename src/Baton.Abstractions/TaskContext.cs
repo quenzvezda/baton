@@ -18,7 +18,12 @@ public sealed class TaskContext<TParams>
 
     public JsonSerializerOptions? SerializerOptions { get; init; }
 
-    /// <summary>Stable across retries of the same task in the same run.</summary>
+    /// <summary>
+    /// Stable across retries of the same task in the same run, including the attempts of a re-run of a failed run
+    /// (WF-10), which reuses the run's id. The key identifies the unit of work, not one success: a handler that
+    /// finds the key already recorded should check whether that earlier attempt actually completed its effect,
+    /// and finish or repeat it, rather than assume it succeeded and return.
+    /// </summary>
     public string IdempotencyKey => $"{RunId}:{TaskKey}";
 
     /// <summary>Reads an ancestor's output. Throws when <paramref name="upstreamTaskKey"/> is not an ancestor (WF-07).</summary>

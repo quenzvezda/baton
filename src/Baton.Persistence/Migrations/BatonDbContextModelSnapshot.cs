@@ -67,6 +67,70 @@ namespace Baton.Persistence.Migrations
                     b.ToTable("agent_credentials", (string)null);
                 });
 
+            modelBuilder.Entity("Baton.Persistence.Entities.AuditEntryEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("action");
+
+                    b.Property<string>("ActorName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("actor_name");
+
+                    b.Property<string>("ActorSubject")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("actor_subject");
+
+                    b.Property<string>("After")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("after");
+
+                    b.Property<DateTimeOffset>("At")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Before")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("before");
+
+                    b.Property<string>("EntityId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("entity_id");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("entity_type");
+
+                    b.HasKey("Id")
+                        .HasName("audit_log_pkey");
+
+                    b.HasIndex("At")
+                        .HasDatabaseName("ix_audit_at");
+
+                    b.HasIndex("EntityType", "EntityId", "At", "Id")
+                        .IsDescending(false, false, true, true)
+                        .HasDatabaseName("ix_audit_entity");
+
+                    b.ToTable("audit_log", null, t =>
+                        {
+                            t.HasCheckConstraint("audit_log_entity_type_check", "entity_type IN ('automation','host_group','agent_credential','workflow_limit')");
+                        });
+                });
+
             modelBuilder.Entity("Baton.Persistence.Entities.AutomationEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -387,6 +451,61 @@ namespace Baton.Persistence.Migrations
                     b.ToTable("host_groups", (string)null);
                 });
 
+            modelBuilder.Entity("Baton.Persistence.Entities.NotificationChannelEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AutomationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("automation_id");
+
+                    b.PrimitiveCollection<string[]>("EmailTo")
+                        .HasColumnType("text[]")
+                        .HasColumnName("email_to");
+
+                    b.PrimitiveCollection<string[]>("Events")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("events");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("kind");
+
+                    b.Property<byte[]>("WebhookSecret")
+                        .HasColumnType("bytea")
+                        .HasColumnName("webhook_secret");
+
+                    b.Property<byte[]>("WebhookUrl")
+                        .HasColumnType("bytea")
+                        .HasColumnName("webhook_url");
+
+                    b.Property<string>("WebhookUrlDisplay")
+                        .HasColumnType("text")
+                        .HasColumnName("webhook_url_display");
+
+                    b.HasKey("Id")
+                        .HasName("notification_channels_pkey");
+
+                    b.HasIndex("AutomationId")
+                        .HasDatabaseName("ix_notification_channels_automation");
+
+                    b.ToTable("notification_channels", null, t =>
+                        {
+                            t.HasCheckConstraint("notification_channels_email_check", "(kind = 'email') = (email_to IS NOT NULL)");
+
+                            t.HasCheckConstraint("notification_channels_events_check", "events <@ ARRAY['failed','timed_out'] AND cardinality(events) > 0");
+
+                            t.HasCheckConstraint("notification_channels_kind_check", "kind IN ('email','webhook')");
+
+                            t.HasCheckConstraint("notification_channels_webhook_check", "(kind = 'webhook') = (webhook_url IS NOT NULL AND webhook_secret IS NOT NULL)");
+                        });
+                });
+
             modelBuilder.Entity("Baton.Persistence.Entities.WorkflowDefinitionEntity", b =>
                 {
                     b.Property<long>("Id")
@@ -513,6 +632,16 @@ namespace Baton.Persistence.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("hosts_host_group_id_fkey");
+                });
+
+            modelBuilder.Entity("Baton.Persistence.Entities.NotificationChannelEntity", b =>
+                {
+                    b.HasOne("Baton.Persistence.Entities.AutomationEntity", null)
+                        .WithMany()
+                        .HasForeignKey("AutomationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("notification_channels_automation_id_fkey");
                 });
 #pragma warning restore 612, 618
         }

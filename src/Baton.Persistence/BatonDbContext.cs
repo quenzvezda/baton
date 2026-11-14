@@ -20,6 +20,8 @@ public sealed class BatonDbContext(DbContextOptions<BatonDbContext> options) : D
     public DbSet<AutomationEntity> Automations => Set<AutomationEntity>();
     public DbSet<AutomationTriggerEntity> AutomationTriggers => Set<AutomationTriggerEntity>();
     public DbSet<ConcurrencyLimitEntity> ConcurrencyLimits => Set<ConcurrencyLimitEntity>();
+    public DbSet<NotificationChannelEntity> NotificationChannels => Set<NotificationChannelEntity>();
+    public DbSet<AuditEntryEntity> AuditLog => Set<AuditEntryEntity>();
 
     /// <summary>The Data Protection key ring that encrypts webhook secrets (ADR-0015).</summary>
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();

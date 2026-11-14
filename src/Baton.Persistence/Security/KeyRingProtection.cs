@@ -1,7 +1,8 @@
 using System.Security.Cryptography.X509Certificates;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.Extensions.Configuration;
 
-namespace Baton.ControlPlane.Api.Security;
+namespace Baton.Persistence.Security;
 
 /// <summary>
 /// Encrypts the Data Protection key ring at rest with a certificate when

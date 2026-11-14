@@ -25,6 +25,7 @@ else
             <StatusBadge Status="@(_saved.Enabled ? "enabled" : "disabled")" />
             <span class="muted">owner @_saved.Owner · updated <Moment Value="_saved.UpdatedAt" /></span>
             <a href="@($"runs?automationId={_saved.Id}")">Runs</a>
+            <a href="@($"automations/{_saved.Id}/history")">History</a>
             @if (_canOperate)
             {
                 <button type="button" disabled="@(_busy || !_saved.Enabled)" @onclick="RunNowAsync">Run now</button>
@@ -48,6 +49,12 @@ else
     @foreach (var secret in _issuedSecrets)
     {
         <p class="notice" role="status">Webhook secret (shown once, store it now): <code>@secret</code></p>
+    }
+    @foreach (var (host, secret) in _issuedSigningSecrets)
+    {
+        <p class="notice" role="status" data-signing-secret>
+            Notification webhook signing secret for @(host ?? "the new channel") (shown once, store it now): <code>@secret</code>
+        </p>
     }
 
     <form class="editor" @onsubmit="SaveAsync" @onsubmit:preventDefault>
@@ -189,6 +196,64 @@ else
         </fieldset>
 
         <fieldset disabled="@(!_canOperate)">
+            <legend>Notifications</legend>
+            <FieldError Text="@Error("notifications")" />
+            @if (_draft.Notifications.Count == 0)
+            {
+                <p class="muted">Nobody is notified when a run fails or times out.</p>
+            }
+            @for (var i = 0; i < _draft.Notifications.Count; i++)
+            {
+                var index = i;
+                var channel = _draft.Notifications[index];
+                <div class="trigger channel" data-channel="@index">
+                    <strong>@channel.Kind</strong>
+                    <div class="field narrow@Invalid($"notifications[{index}].on")">
+                        <span class="label">Notify when a run</span>
+                        <label class="check"><input type="checkbox" id="@($"channel-failed-{index}")" @bind="channel.OnFailed" /> fails</label>
+                        <label class="check"><input type="checkbox" id="@($"channel-timed-out-{index}")" @bind="channel.OnTimedOut" /> times out</label>
+                        <FieldError Text="@Error($"notifications[{index}].on")" />
+                    </div>
+                    @if (channel.Kind == NotificationDraft.Email)
+                    {
+                        <div class="field@Invalid($"notifications[{index}].recipients")">
+                            <label for="@($"channel-recipients-{index}")">Recipients</label>
+                            <textarea id="@($"channel-recipients-{index}")" rows="2" @bind="channel.Recipients"
+                                      placeholder="one address per line, or comma separated"></textarea>
+                            <FieldError Text="@Error($"notifications[{index}].recipients")" />
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="field@Invalid($"notifications[{index}].url")">
+                            <label for="@($"channel-url-{index}")">@(channel.CurrentHost is null ? "URL" : "New URL")</label>
+                            <input id="@($"channel-url-{index}")" type="url" @bind="channel.Url" placeholder="https://…" class="mono" autocomplete="off" />
+                            @if (channel.CurrentHost is { } host)
+                            {
+                                <span class="muted" data-current-host>Sends to <code>@host</code>; leave empty to keep the stored URL.</span>
+                            }
+                            else
+                            {
+                                <span class="muted">The signing secret is shown once after saving.</span>
+                            }
+                            <FieldError Text="@Error($"notifications[{index}].url")" />
+                        </div>
+                    }
+                    <FieldError Text="@(Error($"notifications[{index}].kind") ?? Error($"notifications[{index}].id") ?? Error($"notifications[{index}]"))" />
+                    @if (_canOperate && channel.Kind == NotificationDraft.Webhook && channel.Id is { } channelId && _saved is not null)
+                    {
+                        <button type="button" class="link" disabled="@_busy" @onclick="() => RotateSigningSecretAsync(channelId, channel.CurrentHost)">Rotate secret</button>
+                    }
+                    <button type="button" class="link" @onclick="() => _draft.Notifications.RemoveAt(index)">Remove</button>
+                </div>
+            }
+            <div class="toolbar">
+                <button type="button" @onclick="@(() => _draft.Notifications.Add(new NotificationDraft { Kind = NotificationDraft.Email }))">Add email channel</button>
+                <button type="button" @onclick="@(() => _draft.Notifications.Add(new NotificationDraft { Kind = NotificationDraft.Webhook }))">Add webhook channel</button>
+            </div>
+        </fieldset>
+
+        <fieldset disabled="@(!_canOperate)">
             <legend>Limits</legend>
             <div class="row">
                 <div class="field@Invalid("priority")">
@@ -250,6 +315,7 @@ else
     private readonly Dictionary<string, string> _paramErrors = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _otherErrors = new(StringComparer.Ordinal);
     private readonly List<string> _issuedSecrets = [];
+    private readonly List<(string? Host, string Secret)> _issuedSigningSecrets = [];
     private readonly Dictionary<TriggerDraft, IReadOnlyDictionary<string, string>> _previewErrors = [];
     private IReadOnlyList<WorkflowSummary> _workflows = [];
     private IReadOnlyList<HostGroup> _groups = [];
@@ -361,6 +427,9 @@ else
                 ? await Api.CreateAutomationAsync(request)
                 : await Api.UpdateAutomationAsync(_saved.Id, _saved.Version, request);
             _issuedSecrets.AddRange(saved.Triggers.Select(t => t.WebhookSecret).OfType<string>());
+            _issuedSigningSecrets.AddRange((saved.Notifications ?? [])
+                .Where(n => n.SigningSecret is not null)
+                .Select(n => (n.Url, n.SigningSecret!)));
             _saved = saved;
             _draft.Load(saved);
             _message = _isNew ? "Automation created." : "Changes saved.";
@@ -391,10 +460,33 @@ else
                 _paramErrors[param] = _paramErrors.TryGetValue(param, out var existing) ? $"{existing} {message}" : message;
             else if (key.Equals("parameters", StringComparison.OrdinalIgnoreCase) && _form?.IsSupported == false)
                 _paramErrors[""] = message;
-            else if (AutomationDraft.Fields.Contains(key) || key.StartsWith("triggers", StringComparison.Ordinal))
+            else if (AutomationDraft.Fields.Contains(key) || key.StartsWith("triggers", StringComparison.Ordinal)
+                     || key.StartsWith("notifications", StringComparison.Ordinal))
                 _errors[key] = message;
             else
                 _otherErrors[key] = message;
+        }
+    }
+
+    /// <summary>OBS-05: the channel's new signing secret is shown once; the old one stops working.</summary>
+    private async Task RotateSigningSecretAsync(Guid channelId, string? host)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var rotated = await Api.RotateNotificationSecretAsync(_saved!.Id, channelId);
+            _issuedSigningSecrets.Add((host, rotated.SigningSecret));
+            // The rotation bumps the automation's version; keep the edits in the draft, take the new version for the next save.
+            _saved = await Api.GetAutomationAsync(_saved.Id) ?? _saved;
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
         }
     }
 

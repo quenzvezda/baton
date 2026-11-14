@@ -217,6 +217,7 @@ internal sealed partial class AgentGrpcService(
                 Timeout = Duration.FromTimeSpan(t.Timeout),
                 ParamsJson = ByteString.CopyFromUtf8(t.ParametersJson),
                 UpstreamOutputsJson = { t.UpstreamOutputs.ToDictionary(o => o.Key, o => ByteString.CopyFromUtf8(o.Value)) },
+                TraceParent = t.TraceParent ?? "",
             }),
         },
     };

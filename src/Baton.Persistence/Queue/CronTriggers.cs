@@ -92,6 +92,9 @@ public sealed class CronTriggers(NpgsqlDataSource dataSource)
             foreach (var fireTime in plan.Fires)
             {
                 var key = $"automation:{automationId}:trigger:{triggerId}:{fireTime.UtcDateTime:O}";
+
+                // OBS-06: each cron firing is the root of its run's trace (design.md decision 27).
+                using var activity = StartRootActivity(automationId, triggerId, fireTime);
                 var result = await RunCreator.FireAsync(connection, transaction,
                     new FireRequest(automationId, triggerId, AutomationRules.CronKind, key, fireTime), ct);
                 outcomes.Add(result.Outcome);
@@ -132,5 +135,18 @@ public sealed class CronTriggers(NpgsqlDataSource dataSource)
         : Exception($"Firing trigger {triggerId} failed.", inner)
     {
         public Guid TriggerId { get; } = triggerId;
+    }
+
+    private static System.Diagnostics.Activity? StartRootActivity(Guid automationId, Guid triggerId, DateTimeOffset fireTime)
+    {
+        var previous = System.Diagnostics.Activity.Current;
+        System.Diagnostics.Activity.Current = null;
+        var activity = BatonActivities.Orchestrator.StartActivity(BatonActivities.TriggerFire, System.Diagnostics.ActivityKind.Internal);
+        if (activity is null)
+            System.Diagnostics.Activity.Current = previous;
+        activity?.SetTag("baton.automation.id", automationId.ToString());
+        activity?.SetTag("baton.trigger.id", triggerId.ToString());
+        activity?.SetTag("baton.trigger.fire_time", fireTime.UtcDateTime.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+        return activity;
     }
 }

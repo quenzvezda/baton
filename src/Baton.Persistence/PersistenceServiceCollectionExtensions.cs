@@ -1,5 +1,6 @@
 using Baton.Persistence.Definitions;
 using Baton.Persistence.Hosts;
+using Baton.Persistence.Notifications;
 using Baton.Persistence.Queue;
 using Baton.Persistence.Runs;
 using Microsoft.EntityFrameworkCore;
@@ -36,9 +37,12 @@ public static class PersistenceServiceCollectionExtensions
         services.AddSingleton<RetryPromoter>();
         services.AddSingleton<RunCreator>();
         services.AddSingleton<RunCancellation>();
+        services.AddSingleton<RunRerun>();
         services.AddSingleton<CronTriggers>();
         services.AddSingleton<RunAdmission>();
         services.AddSingleton<RunQueries>();
+        services.AddSingleton<QueueStats>();
+        services.AddSingleton<NotificationOutbox>();
         services.AddSingleton<TaskLogReader>();
         return services;
     }

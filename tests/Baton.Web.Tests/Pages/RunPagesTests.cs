@@ -122,6 +122,64 @@ public sealed class RunPagesTests
         Assert.Empty(cut.FindAll("button.danger"));
     }
 
+    [Fact]
+    public void Operator_reruns_a_failed_run()
+    {
+        using var ctx = new ConsoleContext(Roles.Operator);
+        var runId = Guid.CreateVersion7();
+        ctx.Api.RunDetails[runId] = SampleData.FailedRun(runId);
+        var cut = ctx.Render<RunDetailPage>(p => p.Add(c => c.Id, runId));
+        Assert.Empty(cut.FindAll("[data-reruns]"));
+
+        RerunButtons(cut).Single().Click();
+
+        Assert.Equal([runId], ctx.Api.Reran);
+        Assert.Equal("pending", cut.Find("h1 .badge").TextContent);
+        Assert.Equal("1", cut.Find("[data-reruns]").TextContent);
+        Assert.Empty(RerunButtons(cut));
+    }
+
+    [Fact]
+    public void Succeeded_run_offers_no_rerun()
+    {
+        using var ctx = new ConsoleContext(Roles.Operator);
+        var runId = Guid.CreateVersion7();
+        ctx.Api.RunDetails[runId] = SampleData.FailedRun(runId) with { Status = "succeeded", Reruns = 2 };
+
+        var cut = ctx.Render<RunDetailPage>(p => p.Add(c => c.Id, runId));
+
+        Assert.Empty(RerunButtons(cut));
+        Assert.Equal("2", cut.Find("[data-reruns]").TextContent);
+    }
+
+    [Fact]
+    public void Viewer_sees_no_rerun_action()
+    {
+        using var ctx = new ConsoleContext(Roles.Viewer);
+        var failed = Guid.CreateVersion7();
+        var timedOut = Guid.CreateVersion7();
+        ctx.Api.RunDetails[failed] = SampleData.FailedRun(failed);
+        ctx.Api.RunDetails[timedOut] = SampleData.FailedRun(timedOut) with { Status = "timed_out" };
+
+        Assert.Empty(RerunButtons(ctx.Render<RunDetailPage>(p => p.Add(c => c.Id, failed))));
+        Assert.Empty(RerunButtons(ctx.Render<RunDetailPage>(p => p.Add(c => c.Id, timedOut))));
+    }
+
+    [Fact]
+    public void Operator_can_rerun_a_timed_out_run()
+    {
+        using var ctx = new ConsoleContext(Roles.Operator);
+        var runId = Guid.CreateVersion7();
+        ctx.Api.RunDetails[runId] = SampleData.FailedRun(runId) with { Status = "timed_out" };
+
+        var cut = ctx.Render<RunDetailPage>(p => p.Add(c => c.Id, runId));
+
+        Assert.Single(RerunButtons(cut));
+    }
+
+    private static IEnumerable<AngleSharp.Dom.IElement> RerunButtons(IRenderedComponent<RunDetailPage> cut) =>
+        cut.FindAll("button").Where(b => b.TextContent == "Re-run failed tasks");
+
     private static Guid AddRun(FakeBatonApi api, string status)
     {
         var id = Guid.CreateVersion7();

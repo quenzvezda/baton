@@ -117,9 +117,13 @@ else
 
     [SupplyParameterFromQuery(Name = "status")] public string? Status { get; set; }
 
+    /// <summary>Set by the queue page's group links (OBS-04).</summary>
+    [SupplyParameterFromQuery] public Guid? HostGroupId { get; set; }
+
     protected override async Task OnInitializedAsync()
     {
         _automationId = AutomationId?.ToString() ?? "";
+        _hostGroupId = HostGroupId?.ToString() ?? "";
         if (!string.IsNullOrEmpty(Status))
             _statuses.Add(Status);
         try
