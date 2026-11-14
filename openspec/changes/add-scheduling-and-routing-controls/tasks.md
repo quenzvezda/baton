@@ -29,8 +29,8 @@
 
 ## 5. Dispatch pause (ORC-13)
 
-- [ ] 5.1 `POST /api/host-groups/{id}/pause` and `/resume`, Operator, idempotent, `dispatchPaused` in reads (decision 14); verify `Operator_pauses_and_resumes_a_group`, `Viewer_cannot_pause`, `Pause_twice_is_a_no_op`
-- [ ] 5.2 Claims of a paused group lease nothing and resume wakes waiting agents; verify Testcontainers tests `Paused_group_leases_nothing_while_running_tasks_finish`, `Runs_are_admitted_while_the_group_is_paused`, `Resume_wakes_a_long_polling_agent_within_2_s`
+- [x] 5.1 `POST /api/host-groups/{id}/pause` and `/resume`, Operator, idempotent, `dispatchPaused` in reads (decision 14); verify `Operator_pauses_and_resumes_a_group`, `Viewer_cannot_pause`, `Pause_twice_is_a_no_op`
+- [x] 5.2 Claims of a paused group lease nothing and resume wakes waiting agents; verify Testcontainers tests `Paused_group_leases_nothing_while_running_tasks_finish`, `Runs_are_admitted_while_the_group_is_paused`, `Resume_wakes_a_long_polling_agent_within_2_s`
 
 ## 6. Console
 

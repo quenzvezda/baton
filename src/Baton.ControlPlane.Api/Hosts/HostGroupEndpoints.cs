@@ -2,6 +2,7 @@ using Baton.ControlPlane.Api.Security;
 using Baton.Domain.Hosts;
 using Baton.Persistence;
 using Baton.Persistence.Entities;
+using Baton.Persistence.Queue;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -24,9 +25,9 @@ public sealed record AgentTokenSummary(Guid Id, string Name, DateTimeOffset Crea
 
 /// <summary>
 /// Host groups and their limits (HST-01) and the group's agent credentials (NFR-Security, ADR-0013).
-/// Viewers read groups; everything else is Admin.
+/// Viewers read groups; Operators pause and resume dispatch (ORC-13); everything else is Admin.
 /// </summary>
-public static class HostGroupEndpoints
+public static partial class HostGroupEndpoints
 {
     private const int MaxTokenNameLength = 100;
 
@@ -38,6 +39,10 @@ public static class HostGroupEndpoints
         groups.MapPost("/", CreateAsync).RequireAuthorization(BatonRoles.Admin);
         groups.MapPut("/{id:guid}", UpdateAsync).RequireAuthorization(BatonRoles.Admin);
         groups.MapDelete("/{id:guid}", DeleteAsync).RequireAuthorization(BatonRoles.Admin);
+        groups.MapPost("/{id:guid}/pause", (Guid id, BatonDbContext db, HttpContext http, ILoggerFactory loggers, CancellationToken ct) =>
+            SetPausedAsync(id, true, db, http, loggers, ct)).RequireAuthorization(BatonRoles.Operator);
+        groups.MapPost("/{id:guid}/resume", (Guid id, BatonDbContext db, HttpContext http, ILoggerFactory loggers, CancellationToken ct) =>
+            SetPausedAsync(id, false, db, http, loggers, ct)).RequireAuthorization(BatonRoles.Operator);
 
         groups.MapGet("/{id:guid}/agent-tokens", ListTokensAsync).RequireAuthorization(BatonRoles.Admin);
         groups.MapPost("/{id:guid}/agent-tokens", IssueTokenAsync).RequireAuthorization(BatonRoles.Admin);
@@ -224,6 +229,41 @@ public static class HostGroupEndpoints
     private static Dictionary<string, string[]> Validate(HostGroupRequest request) =>
         HostGroupRules.Validate(request.Name, request.MaxConcurrentRuns, request.MaxConcurrentTasks,
             request.LeaseSeconds ?? HostGroupRules.DefaultLeaseSeconds);
+
+    /// <summary>
+    /// ORC-13 (M6 design.md decision 14): claims of a paused group lease nothing; leased and running tasks go on and
+    /// admission continues. Resuming notifies the group's waiting claims in the same transaction, so agents get
+    /// work at once instead of at their next re-check. Idempotent: pausing a paused group changes nothing.
+    /// </summary>
+    private static async Task<Results<Ok<HostGroupResponse>, NotFound>> SetPausedAsync(
+        Guid id, bool paused, BatonDbContext db, HttpContext http, ILoggerFactory loggers, CancellationToken ct)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var group = await db.HostGroups.SingleOrDefaultAsync(g => g.Id == id, ct);
+        if (group is null)
+            return TypedResults.NotFound();
+
+        if (group.DispatchPaused != paused)
+        {
+            group.DispatchPaused = paused;
+            await db.SaveChangesAsync(ct);
+            if (!paused)
+                await db.Database.ExecuteSqlAsync($"SELECT pg_notify({DbNames.TasksReadyChannel}, {id.ToString()})", ct);
+
+            var logger = loggers.CreateLogger(typeof(HostGroupEndpoints));
+            if (logger.IsEnabled(LogLevel.Information))
+            {
+                var by = http.User.FindFirst("name")?.Value ?? http.User.FindFirst("sub")?.Value ?? "unknown";
+                LogDispatchPaused(logger, group.Name, paused, by);
+            }
+        }
+
+        await transaction.CommitAsync(ct);
+        return TypedResults.Ok(ToResponse(group));
+    }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Dispatch of host group {Group} paused: {Paused}, by {By}")]
+    private static partial void LogDispatchPaused(ILogger logger, string group, bool paused, string by);
 
     private static void Apply(HostGroupEntity group, HostGroupRequest request)
     {
