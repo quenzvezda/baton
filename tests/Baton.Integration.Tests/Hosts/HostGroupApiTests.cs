@@ -171,6 +171,57 @@ public sealed class HostGroupApiTests(PostgresFixture pg) : IAsyncLifetime
         Assert.Equal(20, group.GetProperty("maxConcurrentTasks").GetInt32());
     }
 
+    // M6 task 5.1 (ORC-13).
+    [Fact]
+    public async Task Operator_pauses_and_resumes_a_group()
+    {
+        var group = await CreateGroupAsync();
+        using var http = _api.Client(BatonRoles.Operator);
+
+        var paused = await http.PostAsync(Url($"/api/host-groups/{group}/pause"), null);
+        Assert.Equal(HttpStatusCode.OK, paused.StatusCode);
+        Assert.True((await paused.Content.ReadFromJsonAsync<HostGroupResponse>())!.DispatchPaused);
+        using var viewer = _api.Client(BatonRoles.Viewer);
+        Assert.True((await viewer.GetFromJsonAsync<HostGroupResponse>(Url($"/api/host-groups/{group}")))!.DispatchPaused);
+
+        var resumed = await http.PostAsync(Url($"/api/host-groups/{group}/resume"), null);
+        Assert.False((await resumed.Content.ReadFromJsonAsync<HostGroupResponse>())!.DispatchPaused);
+        Assert.False(await HostData.ScalarAsync<bool>(pg, "SELECT dispatch_paused FROM host_groups WHERE id = @id", ("id", group)));
+    }
+
+    [Fact]
+    public async Task Viewer_cannot_pause()
+    {
+        var group = await CreateGroupAsync();
+        using var http = _api.Client(BatonRoles.Viewer);
+
+        var response = await http.PostAsync(Url($"/api/host-groups/{group}/pause"), null);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.False(await HostData.ScalarAsync<bool>(pg, "SELECT dispatch_paused FROM host_groups WHERE id = @id", ("id", group)));
+    }
+
+    [Fact]
+    public async Task Pause_twice_is_a_no_op()
+    {
+        var group = await CreateGroupAsync();
+        using var http = _api.Client(BatonRoles.Operator);
+
+        await http.PostAsync(Url($"/api/host-groups/{group}/pause"), null);
+        var again = await http.PostAsync(Url($"/api/host-groups/{group}/pause"), null);
+        var unknown = await http.PostAsync(Url($"/api/host-groups/{Guid.CreateVersion7()}/resume"), null);
+
+        Assert.Equal(HttpStatusCode.OK, again.StatusCode);
+        Assert.True((await again.Content.ReadFromJsonAsync<HostGroupResponse>())!.DispatchPaused);
+        Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+    }
+
+    private async Task<Guid> CreateGroupAsync()
+    {
+        var response = await _admin.PostAsJsonAsync(Url("/api/host-groups"), new HostGroupRequest(HostData.NewName("etl"), null, null, null));
+        return (await response.Content.ReadFromJsonAsync<HostGroupResponse>())!.Id;
+    }
+
     private static Uri Url(string path) => new(path, UriKind.Relative);
 
     private async Task<int?> LimitAsync(string key)

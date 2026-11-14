@@ -36,6 +36,7 @@ public static class ControlPlane
         app.MapHostGroups();
         app.MapHosts();
         app.MapAutomations();
+        app.MapCronPreview();
         app.MapWebhooks();
         app.MapRuns();
         return app;

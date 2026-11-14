@@ -1,6 +1,6 @@
 # M6 — Scheduling & routing controls
 
-**Phase:** 2 · **Change:** `add-scheduling-and-routing-controls` *(create when starting)* · **Depends on:** G1
+**Phase:** 2 · **Change:** `add-scheduling-and-routing-controls` · **Depends on:** G1
 
 ## Goal
 
@@ -22,6 +22,6 @@ OQ-03 (PinnedRun importance), OQ-04 (re-pin vs fail when the pinned host dies).
 
 ## Exit criteria
 
-- [ ] Change created, validated, implemented and archived
-- [ ] Aging keeps the dispatch index usable (only changed rows updated) — measured under G1 load profile
-- [ ] OQ-04 answered
+- [x] Change created, validated, implemented and archived (`2026-11-14-add-scheduling-and-routing-controls`, PR #9)
+- [x] Aging keeps the dispatch index usable (only changed rows updated) — measured under G1 load profile ([report](../reports/m6-aging-load.md): exactly backlog × cap writes, p95 Queued→Leased 14 ms)
+- [x] OQ-04 answered: the run fails with "pinned host lost" (change design.md, 2026-11-14)

@@ -36,7 +36,7 @@ public sealed class AgentLifecycleTests
         agent.Registered(draining: true);
 
         Assert.Equal(AgentState.Draining, agent.State);
-        Assert.False(agent.CanClaim);
+        Assert.True(agent.CanClaim); // M6: the orchestrator hands a draining host only its pinned runs' tasks
     }
 
     [Fact]

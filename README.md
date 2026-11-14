@@ -27,7 +27,7 @@ and fenced leases keep a stale worker from ever overwriting a newer result.
 ---
 
 > [!NOTE]
-> **Project status: M0–M5 done and Gate G1 passed; v1 is complete, phase 2 (M6, M7) next.** The design, the architecture
+> **Project status: v1 complete (M0–M5, Gate G1); phase 2 under way: M6 done, M7 next.** The design, the architecture
 > decisions and the specifications for every v1 milestone are complete. The schema, test harness and
 > CI are in place, and workflows written in C# are validated, versioned, registered and listed by the
 > catalog API. Agents register, heartbeat and drain with group-scoped credentials, and people sign
@@ -35,7 +35,9 @@ and fenced leases keep a stale worker from ever overwriting a newer result.
 > failed attempts are retried elsewhere. Automations fire on cron, Run now and signed webhooks; runs
 > are admitted under limits, time out and can be cancelled. A Blazor console lets people browse
 > workflows, edit automations, and follow runs, task graphs and logs live. Load, chaos, security and
-> backup checks passed at proof-of-concept scale, with runbooks for operators. See [Roadmap](#roadmap).
+> backup checks passed at proof-of-concept scale, with runbooks for operators. Cron triggers have
+> misfire policies and a fire-time preview, waiting tasks age in priority, runs can be pinned to one
+> host, and operators can pause dispatch per host group. See [Roadmap](#roadmap).
 
 ## Why Baton?
 
@@ -235,7 +237,8 @@ mapped to a milestone.
 | **M4** | [Automations & run lifecycle](docs/milestones/M4-automations-and-run-lifecycle.md) | Triggers, admission, limits, cancellation | ✅ Done |
 | **M5** | [Web console & monitoring](docs/milestones/M5-web-console-and-monitoring.md) | Catalog, runs, DAG view, live logs, hosts | ✅ Done |
 | **G1** | [v1 production readiness](docs/milestones/G1-v1-production-readiness.md) | Load, chaos and security gate | ✅ Done |
-| M6–M8 | [Phase 2 & 3](ROADMAP.md) | Aging, pinned runs, audit log, re-run from failure, OTel, extensibility | Planned |
+| **M6** | [Scheduling & routing controls](docs/milestones/M6-scheduling-and-routing.md) | Misfire policy, fire-time preview, aging, pinned runs, group pause | ✅ Done |
+| M7–M8 | [Phase 2 & 3](ROADMAP.md) | Audit log, re-run from failure, queue dashboard, notifications, OTel, extensibility | Planned |
 
 Full plan, dependency graph and gates: [ROADMAP.md](ROADMAP.md).
 

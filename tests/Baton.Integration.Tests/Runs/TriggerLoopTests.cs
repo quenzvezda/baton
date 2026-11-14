@@ -46,7 +46,9 @@ public sealed class TriggerLoopTests(PostgresFixture pg)
     public async Task After_downtime_a_trigger_fires_once_and_moves_to_the_next_future_time()
     {
         var s = await RunScenario.CreateAsync(pg, policy: "allow", maxRuns: 10);
-        var trigger = await AddCronTriggerAsync(s.AutomationId, "* * * * *", "UTC", dueSecondsAgo: 600);
+        // Yearly, so no fire time other than next_fire_at falls in the 10 missed minutes (M6: a per-minute trigger
+        // would also fire its on-time minute, AUT-08).
+        var trigger = await AddCronTriggerAsync(s.AutomationId, "0 0 1 1 *", "UTC", dueSecondsAgo: 600);
         var triggers = new CronTriggers(pg.DataSource);
 
         await triggers.FireDueAsync(CancellationToken.None);
@@ -97,6 +99,24 @@ public sealed class TriggerLoopTests(PostgresFixture pg)
     }
 
     /// <param name="dueSecondsAgo">Sets <c>next_fire_at</c> that far in the past (negative: in the future).</param>
+    internal static Task<Guid> AddCronTriggerAsync(PostgresFixture pg, Guid automationId, string expression, string zone,
+        int dueSecondsAgo, string misfirePolicy = "fire_once", int? catchUpLimit = null) =>
+        AddCronTriggerAsync(pg, automationId, expression, zone, $"now() - make_interval(secs => {dueSecondsAgo})", misfirePolicy, catchUpLimit);
+
+    /// <param name="nextFireAtSql">SQL for <c>next_fire_at</c>, e.g. <c>'2020-01-01Z'</c>.</param>
+    internal static async Task<Guid> AddCronTriggerAsync(PostgresFixture pg, Guid automationId, string expression, string zone,
+        string nextFireAtSql, string misfirePolicy = "fire_once", int? catchUpLimit = null)
+    {
+        var id = Guid.CreateVersion7();
+        await HostData.ExecuteAsync(pg, $"""
+            INSERT INTO automation_triggers (id, automation_id, kind, cron_expr, time_zone, next_fire_at, misfire_policy, catch_up_limit)
+            VALUES (@id, @automation, 'cron', @expr, @zone, {nextFireAtSql}, @policy, @limit)
+            """, ("id", id), ("automation", automationId), ("expr", expression), ("zone", zone), ("policy", misfirePolicy),
+            ("limit", (object?)(short?)catchUpLimit ?? DBNull.Value));
+        Assert.NotNull(CronSchedule.TryCreate(expression, zone, out _));
+        return id;
+    }
+
     private async Task<Guid> AddCronTriggerAsync(Guid automationId, string expression, string zone, int dueSecondsAgo)
     {
         var id = Guid.CreateVersion7();

@@ -13,6 +13,9 @@ internal sealed class AutomationTriggerConfiguration : IEntityTypeConfiguration<
             t.HasCheckConstraint("automation_triggers_kind_check", "kind IN ('cron','webhook','manual')");
             t.HasCheckConstraint("automation_triggers_misfire_policy_check",
                 "misfire_policy IN ('fire_once','skip','catch_up')");
+            t.HasCheckConstraint("automation_triggers_catch_up_limit_check", "catch_up_limit BETWEEN 1 AND 10");
+            t.HasCheckConstraint("automation_triggers_catch_up_limit_policy_check",
+                "(misfire_policy = 'catch_up') = (catch_up_limit IS NOT NULL)");
         });
         builder.HasKey(t => t.Id);
         builder.Property(t => t.MisfirePolicy).HasSuppliedDefault("'fire_once'");

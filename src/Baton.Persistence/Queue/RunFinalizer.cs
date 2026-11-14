@@ -4,8 +4,8 @@ namespace Baton.Persistence.Queue;
 
 /// <summary>
 /// Ends a run once none of its tasks is left unfinished ("Run outcome", design.md "Finalization"): a cancelling
-/// run ends Cancelled, or TimedOut when its deadline cancelled it; otherwise Failed if any task Failed, else
-/// Succeeded (Skipped tasks alone never fail a run). The caller holds the run row and releases the limits
+/// run ends Cancelled, or TimedOut when its deadline cancelled it, or Failed when its pinned host was lost (ORC-12);
+/// otherwise Failed if any task Failed, else Succeeded (Skipped tasks alone never fail a run). The caller holds the run row and releases the limits
 /// this returns in the same transaction.
 /// </summary>
 internal static class RunFinalizer
@@ -14,7 +14,9 @@ internal static class RunFinalizer
         WITH ended AS (
           UPDATE workflow_runs r SET
             status = CASE
-                       WHEN r.status = 'cancelling' THEN CASE WHEN r.cancel_reason = 'timeout' THEN 'timed_out' ELSE 'cancelled' END
+                       WHEN r.status = 'cancelling' THEN CASE r.cancel_reason WHEN 'timeout' THEN 'timed_out'
+                                                                              WHEN 'pinned_host_lost' THEN 'failed'
+                                                                              ELSE 'cancelled' END
                        WHEN EXISTS (SELECT 1 FROM task_runs t WHERE t.workflow_run_id = r.id AND t.status = 'failed') THEN 'failed'
                        ELSE 'succeeded'
                      END,
@@ -22,10 +24,14 @@ internal static class RunFinalizer
           WHERE r.id = @runId AND r.status IN ('running','cancelling')
             AND NOT EXISTS (SELECT 1 FROM task_runs t WHERE t.workflow_run_id = r.id
                             AND t.status NOT IN ('succeeded','failed','skipped','cancelled'))
-          RETURNING r.id, r.status, r.held_limits),
+          RETURNING r.id, r.status, r.held_limits, r.cancel_reason, r.pinned_host_id),
         events AS (
           INSERT INTO run_events (workflow_run_id, type, data)
-          SELECT id, 'run.' || status, jsonb_build_object('released', held_limits) FROM ended)
+          SELECT id, 'run.' || status,
+                 CASE WHEN cancel_reason = 'pinned_host_lost'
+                      THEN jsonb_build_object('released', held_limits, 'reason', 'pinned host lost', 'hostId', pinned_host_id)
+                      ELSE jsonb_build_object('released', held_limits) END
+          FROM ended)
         SELECT held_limits FROM ended
         """;
 

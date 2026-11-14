@@ -8,7 +8,10 @@ public enum AgentState
     /// <summary>Registered and eligible: may claim work.</summary>
     Online,
 
-    /// <summary>Drained by an operator (HST-04): keeps heartbeating and running its tasks, claims nothing.</summary>
+    /// <summary>
+    /// Drained by an operator (HST-04): keeps heartbeating and running its tasks. It still claims, and the
+    /// orchestrator gives it only the remaining tasks of runs pinned to it (ORC-12, M6 design.md decision 5).
+    /// </summary>
     Draining,
 
     /// <summary>Shutdown requested: claims nothing, waits for running tasks to finish.</summary>
@@ -39,8 +42,11 @@ public sealed class AgentLifecycle
         get { lock (_gate) return _runningTasks; }
     }
 
-    /// <summary>Only an Online agent claims new work.</summary>
-    public bool CanClaim => State == AgentState.Online;
+    /// <summary>
+    /// Online and Draining agents claim; the orchestrator decides what a draining host may take (only tasks of
+    /// runs pinned to it). An agent that is shutting down claims nothing.
+    /// </summary>
+    public bool CanClaim => State is AgentState.Online or AgentState.Draining;
 
     /// <summary>Heartbeats tell the orchestrator the agent is draining itself only while it shuts down.</summary>
     public bool ReportsDraining => State is AgentState.Stopping or AgentState.Stopped;

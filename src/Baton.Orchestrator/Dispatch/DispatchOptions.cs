@@ -1,3 +1,5 @@
+using Baton.Domain.Runs;
+
 namespace Baton.Orchestrator.Dispatch;
 
 /// <summary>Dispatch timings, bound from <c>Dispatch</c>. The defaults are the design's (design spec §6, §8); tests shorten them.</summary>
@@ -24,4 +26,14 @@ public sealed class DispatchOptions
     public TimeSpan TriggerInterval { get; set; } = TimeSpan.FromSeconds(1);
 
     public TimeSpan AdmissionInterval { get; set; } = TimeSpan.FromSeconds(1);
+
+    /// <summary>ORC-06: one point of effective priority per step a task waits Queued (M6 design.md decision 3).</summary>
+    public TimeSpan AgingStep { get; set; } = AgingSettings.Default.Step;
+
+    /// <summary>ORC-06: at most this many points from aging; 0 disables it.</summary>
+    public int AgingCap { get; set; } = AgingSettings.Default.Cap;
+
+    public TimeSpan AgingInterval { get; set; } = TimeSpan.FromSeconds(30);
+
+    public AgingSettings Aging => new(AgingStep, AgingCap);
 }

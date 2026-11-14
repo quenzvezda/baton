@@ -86,6 +86,7 @@ public static class DbNames
         RunCancelReason.User => "user",
         RunCancelReason.Replaced => "replaced",
         RunCancelReason.Timeout => "timeout",
+        RunCancelReason.PinnedHostLost => "pinned_host_lost",
         _ => throw new ArgumentOutOfRangeException(nameof(reason), reason, null),
     };
 }
@@ -101,6 +102,9 @@ public enum RunCancelReason
 
     /// <summary>It passed its deadline (AUT-09).</summary>
     Timeout,
+
+    /// <summary>The host a PinnedRun run is pinned to went Offline or left the group; the run ends Failed (ORC-12, OQ-04).</summary>
+    PinnedHostLost,
 }
 
 /// <summary><c>run_events.type</c> values written by dispatch (design.md "Decisions agreed with the owner").</summary>
@@ -120,6 +124,9 @@ public static class RunEventTypes
 
     /// <summary>A firing under Skip at the limit; recorded under the automation's id, as no run exists.</summary>
     public const string RunSkipped = "run.skipped";
+
+    /// <summary>Missed cron fire times the misfire policy passed over (AUT-08); filed under the automation's id.</summary>
+    public const string TriggerMisfired = "trigger.misfired";
 
     /// <summary>Admission passed the run over; written when the limit it waits for changes, not on every tick.</summary>
     public const string RunBlocked = "run.blocked";

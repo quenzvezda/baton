@@ -26,7 +26,12 @@ public sealed partial class ReaperLoop(LeaseReaper reaper, IOptions<DispatchOpti
             LogCancelGrace(Logger, summary.CancelledAfterGrace);
         if (summary.RunsTimedOut > 0)
             LogRunsTimedOut(Logger, summary.RunsTimedOut);
+        if (summary.RunsPinnedHostLost > 0)
+            LogPinnedHostLost(Logger, summary.RunsPinnedHostLost);
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Failing {Count} runs whose pinned host was lost")]
+    private static partial void LogPinnedHostLost(ILogger logger, int count);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Closed {Count} cancelled attempts whose handler ignored the cancellation")]
     private static partial void LogCancelGrace(ILogger logger, int count);

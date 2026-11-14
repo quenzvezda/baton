@@ -16,7 +16,8 @@ public sealed class RetryPromoter(NpgsqlDataSource dataSource)
           LIMIT 500
           FOR UPDATE SKIP LOCKED),
         queued AS (
-          UPDATE task_runs t SET status = 'queued', queued_at = now(), not_before = NULL
+          UPDATE task_runs t SET status = 'queued', queued_at = now(), not_before = NULL,
+                                 effective_priority = t.priority -- ORC-06: a re-queued task ages from its base again
           FROM due WHERE t.id = due.id
           RETURNING t.workflow_run_id, t.task_key, t.attempt, t.host_group_id),
         events AS (

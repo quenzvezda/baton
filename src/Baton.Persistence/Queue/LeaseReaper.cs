@@ -8,14 +8,18 @@ namespace Baton.Persistence.Queue;
 /// <summary>What one reaper pass closed.</summary>
 /// <param name="CancelledAfterGrace">Attempts whose cancellation was requested <see cref="LeaseReaper.CancelGrace"/> ago (ORC-11).</param>
 /// <param name="RunsTimedOut">Runs past their deadline whose cancellation began (AUT-09).</param>
-public readonly record struct ReapSummary(int Lost, int TimedOut, int HostsMarkedOffline, int CancelledAfterGrace = 0, int RunsTimedOut = 0);
+/// <param name="RunsPinnedHostLost">PinnedRun runs whose host went Offline or left the group; they end Failed (ORC-12).</param>
+public readonly record struct ReapSummary(
+    int Lost, int TimedOut, int HostsMarkedOffline, int CancelledAfterGrace = 0, int RunsTimedOut = 0, int RunsPinnedHostLost = 0);
 
 /// <summary>
 /// The reaper's SQL (ORC-09, WF-05; design spec §7 "Expired leases"). Candidates are read without locks;
 /// each is closed in its own transaction that locks the run, then re-checks the task under lock (design.md
 /// "Lock order"), so replicas and a concurrent Complete never close an attempt twice. Since M4 it also closes
 /// cancelled attempts whose handler did not stop within <see cref="CancelGrace"/> (ORC-11, M4 design.md
-/// decision 6) and starts the cancellation of runs past their deadline, which then end TimedOut (AUT-09).
+/// decision 6) and starts the cancellation of runs past their deadline, which then end TimedOut (AUT-09). Since M6
+/// it starts the cancellation of PinnedRun runs whose host is lost, which then end Failed (ORC-12, M6 design.md
+/// decision 13).
 /// </summary>
 public sealed class LeaseReaper(NpgsqlDataSource dataSource, DefinitionGraphCache graphs)
 {
@@ -53,6 +57,19 @@ public sealed class LeaseReaper(NpgsqlDataSource dataSource, DefinitionGraphCach
 
     private const string LockPastDeadlineSql = """
         SELECT id FROM workflow_runs WHERE id = @id AND status = 'running' AND deadline_at <= now() FOR UPDATE SKIP LOCKED
+        """;
+
+    // Offline (no heartbeat for 30 s) or moved to another group; a removed host cannot be referenced (FK).
+    private static readonly string PinnedHostLostSql = $"""
+        SELECT r.id FROM workflow_runs r JOIN hosts h ON h.id = r.pinned_host_id
+        WHERE r.status = 'running' AND (h.host_group_id <> r.host_group_id OR {HostSql.IsOffline("h")})
+        LIMIT @limit
+        """;
+
+    private static readonly string LockPinnedHostLostSql = $"""
+        SELECT r.id FROM workflow_runs r JOIN hosts h ON h.id = r.pinned_host_id
+        WHERE r.id = @id AND r.status = 'running' AND (h.host_group_id <> r.host_group_id OR {HostSql.IsOffline("h")})
+        FOR UPDATE OF r SKIP LOCKED
         """;
 
     private const string LockRunSql = """
@@ -117,24 +134,35 @@ public sealed class LeaseReaper(NpgsqlDataSource dataSource, DefinitionGraphCach
                 runsTimedOut++;
         }
 
+        var pinnedHostLost = 0;
+        foreach (var id in await CandidatesAsync(PinnedHostLostSql, ct))
+        {
+            if (await CancelRunAsync(id, LockPinnedHostLostSql, RunCancelReason.PinnedHostLost, ct))
+                pinnedHostLost++;
+        }
+
         await using var offline = dataSource.CreateCommand(OfflineSql);
         var hosts = await offline.ExecuteNonQueryAsync(ct);
-        return new ReapSummary(lost, timedOut, hosts, cancelled, runsTimedOut);
+        return new ReapSummary(lost, timedOut, hosts, cancelled, runsTimedOut, pinnedHostLost);
     }
 
-    private async Task<bool> TimeOutRunAsync(Guid runId, CancellationToken ct)
+    private Task<bool> TimeOutRunAsync(Guid runId, CancellationToken ct) =>
+        CancelRunAsync(runId, LockPastDeadlineSql, RunCancelReason.Timeout, ct);
+
+    /// <summary>Starts the run's cancellation if <paramref name="lockSql"/> still finds it under lock.</summary>
+    private async Task<bool> CancelRunAsync(Guid runId, string lockSql, RunCancelReason reason, CancellationToken ct)
     {
         await using var connection = await dataSource.OpenConnectionAsync(ct);
         await using var transaction = await connection.BeginTransactionAsync(ct);
 
-        await using (var lockRun = new NpgsqlCommand(LockPastDeadlineSql, connection, transaction))
+        await using (var lockRun = new NpgsqlCommand(lockSql, connection, transaction))
         {
             lockRun.Parameters.AddWithValue("id", runId);
             if (await lockRun.ExecuteScalarAsync(ct) is null)
                 return false;
         }
 
-        await RunCancellation.CancelAsync(connection, transaction, runId, RunCancelReason.Timeout, ct);
+        await RunCancellation.CancelAsync(connection, transaction, runId, reason, ct);
         await transaction.CommitAsync(ct);
         return true;
     }

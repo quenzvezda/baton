@@ -189,6 +189,10 @@ namespace Baton.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("automation_id");
 
+                    b.Property<short?>("CatchUpLimit")
+                        .HasColumnType("smallint")
+                        .HasColumnName("catch_up_limit");
+
                     b.Property<string>("CronExpr")
                         .HasColumnType("text")
                         .HasColumnName("cron_expr");
@@ -234,6 +238,10 @@ namespace Baton.Persistence.Migrations
 
                     b.ToTable("automation_triggers", null, t =>
                         {
+                            t.HasCheckConstraint("automation_triggers_catch_up_limit_check", "catch_up_limit BETWEEN 1 AND 10");
+
+                            t.HasCheckConstraint("automation_triggers_catch_up_limit_policy_check", "(misfire_policy = 'catch_up') = (catch_up_limit IS NOT NULL)");
+
                             t.HasCheckConstraint("automation_triggers_kind_check", "kind IN ('cron','webhook','manual')");
 
                             t.HasCheckConstraint("automation_triggers_misfire_policy_check", "misfire_policy IN ('fire_once','skip','catch_up')");

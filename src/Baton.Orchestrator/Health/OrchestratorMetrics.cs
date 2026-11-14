@@ -14,6 +14,7 @@ public sealed class OrchestratorMetrics
     private readonly Counter<long> _limitCorrections;
     private readonly Counter<long> _partitionsDropped;
     private readonly Counter<long> _runsPurged;
+    private readonly Counter<long> _tasksAged;
 
     public OrchestratorMetrics(IMeterFactory meterFactory)
     {
@@ -25,6 +26,8 @@ public sealed class OrchestratorMetrics
             description: "History partitions dropped by the 90-day retention.");
         _runsPurged = meter.CreateCounter<long>("baton.history.runs_purged", unit: "{run}",
             description: "Finished runs deleted by the 90-day retention.");
+        _tasksAged = meter.CreateCounter<long>("baton.tasks.aged", unit: "{task}",
+            description: "Queued tasks whose effective priority the aging loop raised (ORC-06).");
     }
 
     /// <summary>Tagged with the key's kind (<c>group-tasks</c>, <c>automation</c>, …), never the full key.</summary>
@@ -39,4 +42,6 @@ public sealed class OrchestratorMetrics
     public void PartitionsDropped(int count) => _partitionsDropped.Add(count);
 
     public void RunsPurged(int count) => _runsPurged.Add(count);
+
+    public void TasksAged(int count) => _tasksAged.Add(count);
 }

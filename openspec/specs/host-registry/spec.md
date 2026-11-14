@@ -86,7 +86,7 @@ Agents SHALL heartbeat every 10 seconds, and a host with no heartbeat for 30 sec
 - **THEN** it returns to Online
 
 ### Requirement: Draining hosts (HST-04)
-Operators SHALL be able to drain a host so that it finishes its running tasks and takes no new ones, and to undrain it.
+Operators SHALL be able to drain a host so that it finishes its running tasks and takes no new ones, and to undrain it. A draining host SHALL still take the remaining tasks of runs already pinned to it, so that those runs can finish.
 
 #### Scenario: Drain with running tasks
 - **WHEN** an Operator drains host `etl-01` while it runs 2 tasks
@@ -103,6 +103,10 @@ Operators SHALL be able to drain a host so that it finishes its running tasks an
 #### Scenario: Viewer cannot drain
 - **WHEN** a Viewer drains a host
 - **THEN** the response is 403 Forbidden and the host is unchanged
+
+#### Scenario: Drain with a pinned run
+- **WHEN** an Operator drains host `etl-01` while a run pinned to it still has Waiting tasks
+- **THEN** those tasks are dispatched to `etl-01` when they become Queued, and no task of any other run is
 
 ### Requirement: Single group membership (HST-05)
 Each host SHALL belong to exactly one host group, and moving a host to another group SHALL take effect on the host's next claim.
@@ -133,3 +137,26 @@ The control plane SHALL return every host with its group, status, slots used and
 #### Scenario: Inventory reflects running work
 - **WHEN** a Viewer lists hosts while `etl-01` runs 3 of its 4 slots
 - **THEN** `etl-01` is listed as Online with 3 of 4 slots used, its 3 current tasks and its last heartbeat time
+
+### Requirement: Dispatch pause (ORC-13)
+Operators SHALL be able to pause and resume dispatch for a host group. While paused, no task of the group SHALL be leased; leased and running tasks continue, runs are still admitted and their tasks queue. On resume, waiting hosts SHALL be offered work without waiting for their next poll. Pausing a paused group, or resuming a running one, SHALL succeed without change.
+
+#### Scenario: Pause stops new leases
+- **WHEN** an Operator pauses group `etl` while 3 of its tasks run and 5 are Queued
+- **THEN** the 3 tasks run to completion and the 5 stay Queued while the group is paused
+
+#### Scenario: Runs still admitted while paused
+- **WHEN** a run for group `etl` is created while `etl` is paused and its limits have room
+- **THEN** the run is admitted and Running, and its root tasks are Queued
+
+#### Scenario: Resume
+- **WHEN** an Operator resumes group `etl` while an agent of `etl` is long-polling with free slots
+- **THEN** the agent receives queued tasks within 2 seconds
+
+#### Scenario: Paused state is visible
+- **WHEN** a Viewer lists host groups while `etl` is paused
+- **THEN** `etl` is returned as paused
+
+#### Scenario: Viewer cannot pause
+- **WHEN** a Viewer pauses a host group
+- **THEN** the response is 403 Forbidden and the group is unchanged

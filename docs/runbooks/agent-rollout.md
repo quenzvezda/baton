@@ -36,6 +36,20 @@ FROM hosts h JOIN host_groups g ON g.id = h.host_group_id
 WHERE g.name = '<group>' ORDER BY h.agent_version, h.name;
 ```
 
+**PinnedRun automations (M6, ORC-12).** Every task of a pinned run runs on the host that took its first task.
+A host drained from the console keeps taking the remaining tasks of runs pinned to it, and nothing else, so
+wait until it shows no running tasks **and** no running run is pinned to it before stopping it:
+
+```sql
+SELECT r.id, r.status FROM workflow_runs r JOIN hosts h ON h.id = r.pinned_host_id
+WHERE h.name = '<host>' AND r.status IN ('running','cancelling');
+```
+
+Stopping the agent (SIGTERM) instead of draining it ends its claims at once. If it stays away for 30 s, its
+pinned runs fail with "pinned host lost". Never change a pinned host's labels or remove a definition version
+from its build while runs are pinned to it: the remaining tasks would wait until the run's timeout. Agents
+built before M6 stop claiming when drained, so upgrade every agent of a group before using PinnedRun in it.
+
 Kubernetes: a Deployment rolling update does steps 1–2 for you; set `terminationGracePeriodSeconds` above
 the longest task duration and `maxUnavailable` to keep capacity.
 
@@ -45,6 +59,8 @@ the longest task duration and `maxUnavailable` to keep capacity.
   [stuck queue](stuck-queue.md) section 3.
 - **`lost` attempts during the rollout** → agents were killed instead of stopped, or the stop timeout was
   shorter than the running tasks; tasks were retried. See [lease-expiry spike](lease-expiry-spike.md).
+- **Runs fail with "pinned host lost"** → their pinned host was stopped or killed and stayed away 30 s,
+  or was moved to another group. Drain hosts with pinned runs first (above).
 - **Rollback** → the same procedure with the old build; runs of a version only the new build carries wait
   Queued until a carrier is back.
 

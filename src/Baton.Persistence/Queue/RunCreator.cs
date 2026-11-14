@@ -43,7 +43,7 @@ public sealed class RunCreator(NpgsqlDataSource dataSource)
 {
     private const string LockAutomationSql = """
         SELECT enabled, workflow_key, workflow_version, parameters::text, host_group_id, required_labels, priority,
-               max_concurrent_runs, concurrency_policy, run_timeout
+               max_concurrent_runs, concurrency_policy, run_timeout, placement_mode
         FROM automations WHERE id = @id AND deleted_at IS NULL
         FOR UPDATE
         """;
@@ -65,9 +65,9 @@ public sealed class RunCreator(NpgsqlDataSource dataSource)
 
     private const string InsertRunSql = """
         INSERT INTO workflow_runs (id, automation_id, definition_id, status, priority, host_group_id, parameters, trigger_kind,
-                                   idempotency_key, limit_keys, required_labels, run_timeout)
+                                   idempotency_key, limit_keys, required_labels, run_timeout, placement_mode)
         VALUES (@id, @automationId, @definitionId, 'pending', @priority, @groupId, @parameters, @triggerKind,
-                @idempotencyKey, @limitKeys, @labels, @timeout)
+                @idempotencyKey, @limitKeys, @labels, @timeout, @placement)
         """;
 
     /// <summary>Fires in a transaction of its own (Run now, webhooks).</summary>
@@ -180,6 +180,7 @@ public sealed class RunCreator(NpgsqlDataSource dataSource)
             insert.Parameters.AddWithValue("limitKeys", limitKeys.ToArray());
             insert.Parameters.AddWithValue("labels", automation.RequiredLabels);
             insert.Parameters.AddWithValue("timeout", NpgsqlDbType.Interval, (object?)automation.RunTimeout ?? DBNull.Value);
+            insert.Parameters.AddWithValue("placement", automation.PlacementMode); // fixed for the run's life (ORC-12)
             batch.BatchCommands.Add(insert);
             batch.BatchCommands.Add(RunEvents.Command(newRunId, null, RunEventTypes.RunCreated, new
             {
@@ -206,7 +207,8 @@ public sealed class RunCreator(NpgsqlDataSource dataSource)
         short Priority,
         int MaxConcurrentRuns,
         ConcurrencyPolicy Policy,
-        TimeSpan? RunTimeout)
+        TimeSpan? RunTimeout,
+        string PlacementMode)
     {
         public static Automation Read(NpgsqlDataReader reader)
         {
@@ -224,7 +226,8 @@ public sealed class RunCreator(NpgsqlDataSource dataSource)
                 reader.GetInt16(6),
                 reader.GetInt32(7),
                 policy,
-                reader.IsDBNull(9) ? null : reader.GetFieldValue<TimeSpan>(9));
+                reader.IsDBNull(9) ? null : reader.GetFieldValue<TimeSpan>(9),
+                reader.GetString(10));
         }
     }
 }

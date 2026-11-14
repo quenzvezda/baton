@@ -2,6 +2,7 @@ using Baton.Agent.Protocol.V1;
 using Baton.Orchestrator.Dispatch;
 using Baton.Orchestrator.Health;
 using Baton.Orchestrator.Loops;
+using Baton.Domain.Runs;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Baton.Orchestrator.Agents;
@@ -14,6 +15,10 @@ public static class AgentProtocol
         var options = services.AddOptions<DispatchOptions>();
         if (configuration is not null)
             options.Bind(configuration.GetSection(DispatchOptions.Section));
+        options.Validate(o => o.Aging.Validate().Count == 0,
+                $"{DispatchOptions.Section}:{nameof(DispatchOptions.AgingStep)} must be at least {AgingSettings.MinStep.TotalSeconds:0} s "
+                + $"and {DispatchOptions.Section}:{nameof(DispatchOptions.AgingCap)} between 0 and {TaskPriority.Max}.")
+            .ValidateOnStart();
 
         // Claim wake-ups; needs the keyed `listen` data source (AddBatonListenDataSource).
         services.AddSingleton<TasksReadySignal>();
@@ -37,6 +42,7 @@ public static class AgentProtocol
         services.AddHostedService<ReaperLoop>();
         services.AddHostedService<RetryPromoterLoop>();
         services.AddHostedService<LimitReconcilerLoop>();
+        services.AddHostedService<AgingLoop>();
         return services;
     }
 

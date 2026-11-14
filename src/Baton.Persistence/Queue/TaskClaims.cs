@@ -22,9 +22,17 @@ public sealed record ClaimResult(Guid HostGroupId, IReadOnlyList<ClaimedTask> Ta
 
 /// <summary>
 /// The claim transaction (ORC-04, ORC-05, ORC-07, HST-01; design spec §7 "Claim"; design.md decisions 3
-/// and 4): the host must be Online; the budget is the smallest of the agent's free slots, the host's
-/// capacity minus the leases it holds, and the room in <c>group-tasks</c>; the best eligible tasks are
-/// taken with <c>SKIP LOCKED</c> by effective priority, then queue time, each under a new fencing token.
+/// and 4): the host must be Online and its group's dispatch not paused (ORC-13); the budget is the smallest of
+/// the agent's free slots, the host's capacity minus the leases it holds, and the room in <c>group-tasks</c>;
+/// the best eligible tasks are taken with <c>SKIP LOCKED</c> by effective priority, then queue time, each under a
+/// new fencing token.
+/// <para>
+/// PinnedRun (ORC-12, M6 design.md decisions 5 and 12): a task of a pinned run goes only to the run's host; a task
+/// of a run not yet pinned goes to a host carrying the run's pin labels, and leasing it pins the run to that host.
+/// The pin is a conditional update with <c>SKIP LOCKED</c> on the run row, so two claims racing for one run never
+/// wait on each other: the loser leaves those tasks Queued. A draining host still takes the tasks of runs pinned
+/// to it, and nothing else.
+/// </para>
 /// </summary>
 public sealed class TaskClaims(NpgsqlDataSource dataSource, DefinitionGraphCache graphs)
 {
@@ -32,7 +40,10 @@ public sealed class TaskClaims(NpgsqlDataSource dataSource, DefinitionGraphCache
     private static readonly string HostRowSql = $"""
         SELECT h.host_group_id, h.labels, h.definition_hashes, h.capacity_slots, {HostSql.IsEligible("h")},
                g.lease_seconds,
-               (SELECT count(*)::int FROM task_runs t WHERE t.lease_host_id = h.id AND t.status IN ('leased','running'))
+               (SELECT count(*)::int FROM task_runs t WHERE t.lease_host_id = h.id AND t.status IN ('leased','running')),
+               g.dispatch_paused,
+               NOT {HostSql.IsOffline("h")}
+                 AND EXISTS (SELECT 1 FROM workflow_runs r WHERE r.pinned_host_id = h.id AND r.status = 'running')
         FROM hosts h JOIN host_groups g ON g.id = h.host_group_id
         WHERE h.id = @hostId AND {HostSql.MayActFor("h")}
         FOR NO KEY UPDATE OF h
@@ -40,17 +51,39 @@ public sealed class TaskClaims(NpgsqlDataSource dataSource, DefinitionGraphCache
 
     private const string RoomSql = "SELECT max - in_use FROM concurrency_limits WHERE key = @key FOR UPDATE";
 
+    // Eligible queued tasks; for those of PinnedRun runs not yet pinned, `needs_pin` (ORC-12).
+    private const string PickSql = """
+        SELECT t.id, t.workflow_run_id, t.pinned_run AND r.pinned_host_id IS NULL
+        FROM task_runs t
+        LEFT JOIN workflow_runs r ON t.pinned_run AND r.id = t.workflow_run_id
+        WHERE t.status = 'queued'
+          AND t.host_group_id = @groupId
+          AND t.required_labels <@ @labels
+          AND t.definition_hash = ANY (@hashes)
+          AND (NOT t.pinned_run
+               OR r.pinned_host_id = @hostId
+               OR (r.pinned_host_id IS NULL AND NOT @pinnedOnly AND r.pin_labels <@ @labels))
+          AND (t.pinned_run OR NOT @pinnedOnly)
+        ORDER BY t.effective_priority DESC, t.queued_at
+        LIMIT @budget
+        FOR UPDATE OF t SKIP LOCKED
+        """;
+
+    // Pins the runs no other transaction holds and nobody pinned meanwhile; the rest stay unpinned this time.
+    private const string PinSql = """
+        WITH pinned AS (
+          UPDATE workflow_runs SET pinned_host_id = @hostId
+          WHERE id IN (SELECT id FROM workflow_runs WHERE id = ANY (@runIds) AND pinned_host_id IS NULL
+                       FOR UPDATE SKIP LOCKED)
+          RETURNING id),
+        events AS (
+          INSERT INTO run_events (workflow_run_id, type, data)
+          SELECT id, 'run.pinned', jsonb_build_object('hostId', @hostId) FROM pinned)
+        SELECT id FROM pinned
+        """;
+
     private const string LeaseSql = """
-        WITH picked AS (
-          SELECT id FROM task_runs
-          WHERE status = 'queued'
-            AND host_group_id = @groupId
-            AND required_labels <@ @labels
-            AND definition_hash = ANY (@hashes)
-            AND (pinned_host_id IS NULL OR pinned_host_id = @hostId)
-          ORDER BY effective_priority DESC, queued_at
-          LIMIT @budget
-          FOR UPDATE SKIP LOCKED),
+        WITH picked AS (SELECT unnest(@ids::uuid[]) AS id),
         leased AS (
           UPDATE task_runs t SET
             status           = 'leased',
@@ -96,6 +129,7 @@ public sealed class TaskClaims(NpgsqlDataSource dataSource, DefinitionGraphCache
         Guid groupId;
         string[] labels, hashes;
         int budget, leaseSeconds;
+        bool pinnedOnly;
         await using (var host = new NpgsqlCommand(HostRowSql, connection, transaction))
         {
             host.Parameters.AddWithValue("hostId", hostId);
@@ -108,9 +142,11 @@ public sealed class TaskClaims(NpgsqlDataSource dataSource, DefinitionGraphCache
             groupId = reader.GetGuid(0);
             labels = reader.GetFieldValue<string[]>(1);
             hashes = reader.GetFieldValue<string[]>(2);
-            var eligible = reader.GetBoolean(4);
+            var online = reader.GetBoolean(4);
             leaseSeconds = reader.GetInt32(5);
-            budget = eligible ? Math.Min(freeSlots, reader.GetInt32(3) - reader.GetInt32(6)) : 0;
+            var paused = reader.GetBoolean(7);
+            pinnedOnly = !online && reader.GetBoolean(8); // draining, with runs pinned to it (HST-04 with ORC-12)
+            budget = (online || pinnedOnly) && !paused ? Math.Min(freeSlots, reader.GetInt32(3) - reader.GetInt32(6)) : 0;
         }
 
         var empty = new ClaimResult(groupId, []);
@@ -128,14 +164,42 @@ public sealed class TaskClaims(NpgsqlDataSource dataSource, DefinitionGraphCache
         if (budget <= 0)
             return empty;
 
+        var picked = new List<(Guid Id, Guid RunId, bool NeedsPin)>();
+        await using (var pick = new NpgsqlCommand(PickSql, connection, transaction))
+        {
+            pick.Parameters.AddWithValue("groupId", groupId);
+            pick.Parameters.AddWithValue("hostId", hostId);
+            pick.Parameters.AddWithValue("labels", labels);
+            pick.Parameters.AddWithValue("hashes", hashes);
+            pick.Parameters.AddWithValue("budget", budget);
+            pick.Parameters.AddWithValue("pinnedOnly", pinnedOnly);
+            await using var reader = await pick.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct))
+                picked.Add((reader.GetGuid(0), reader.GetGuid(1), !reader.IsDBNull(2) && reader.GetBoolean(2)));
+        }
+
+        var toPin = picked.Where(p => p.NeedsPin).Select(p => p.RunId).Distinct().ToArray();
+        var pinnedNow = new HashSet<Guid>();
+        if (toPin.Length > 0)
+        {
+            await using var pin = new NpgsqlCommand(PinSql, connection, transaction);
+            pin.Parameters.AddWithValue("hostId", hostId);
+            pin.Parameters.AddWithValue("runIds", toPin);
+            await using var reader = await pin.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct))
+                pinnedNow.Add(reader.GetGuid(0));
+        }
+
+        // Tasks of a run another claim pinned first stay Queued (their row locks go with this transaction).
+        var ids = picked.Where(p => !p.NeedsPin || pinnedNow.Contains(p.RunId)).Select(p => p.Id).ToArray();
+        if (ids.Length == 0)
+            return empty;
+
         var leased = new List<(Guid Id, Guid RunId, string Key, string Hash, int Attempt, long Token, TimeSpan Timeout)>();
         await using (var lease = new NpgsqlCommand(LeaseSql, connection, transaction))
         {
-            lease.Parameters.AddWithValue("groupId", groupId);
+            lease.Parameters.AddWithValue("ids", ids);
             lease.Parameters.AddWithValue("hostId", hostId);
-            lease.Parameters.AddWithValue("labels", labels);
-            lease.Parameters.AddWithValue("hashes", hashes);
-            lease.Parameters.AddWithValue("budget", budget);
             lease.Parameters.AddWithValue("leaseSeconds", (double)leaseSeconds);
             await using var reader = await lease.ExecuteReaderAsync(ct);
             while (await reader.ReadAsync(ct))
