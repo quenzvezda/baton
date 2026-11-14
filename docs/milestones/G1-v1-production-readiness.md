@@ -26,7 +26,7 @@ gate runs on a single machine with `docker compose` and needs no production infr
 
 **Resilience** (chaos report attached)
 - [x] Kill an agent, kill one of two orchestrator replicas, and restart Postgres under load: no accepted run lost, no task running twice concurrently ([report](../reports/g1-chaos-test.md))
-- [x] Rolling agent upgrade under load fails no runs (drain + definition-hash matching) ([report](../reports/g1-chaos-test.md); hash matching by the M3 claim tests)
+- [x] Rolling agent upgrade under load fails no runs (drain + definition-hash matching) ([report](../reports/g1-chaos-test.md): a same-build rolling restart, and an upgrade from `@1` to `@2` of the workflow in which no old agent ran an `@2` task)
 
 **Security**
 - [x] OIDC roles, agent credentials and webhook HMAC reviewed; no secrets in parameters or logs ([report](../reports/g1-security-review.md): Medium findings fixed, Low items recorded)

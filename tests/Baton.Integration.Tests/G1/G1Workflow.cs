@@ -27,6 +27,25 @@ public sealed class G1Pipeline : WorkflowDefinition<G1Params>
     }
 }
 
+/// <summary>
+/// The next version of <see cref="G1Pipeline"/> for the rolling-upgrade test: the same graph plus a
+/// <c>publish</c> task, so its hash differs. Only the "new build" agents carry it.
+/// </summary>
+public sealed class G1PipelineV2 : WorkflowDefinition<G1Params>
+{
+    public override string Key => "g1-pipeline";
+    public override int Version => 2;
+
+    protected override void Define(IWorkflowBuilder<G1Params> wf)
+    {
+        var fetch = wf.Task<G1Work>("fetch").Retry(5, TimeSpan.FromMilliseconds(500));
+        var left = wf.Task<G1Work>("left").DependsOn(fetch).Retry(5, TimeSpan.FromMilliseconds(500));
+        var right = wf.Task<G1Work>("right").DependsOn(fetch).Retry(5, TimeSpan.FromMilliseconds(500));
+        var merge = wf.Task<G1Work>("merge").DependsOn(left, right).Retry(5, TimeSpan.FromMilliseconds(500));
+        wf.Task<G1Work>("publish").DependsOn(merge).Retry(5, TimeSpan.FromMilliseconds(500));
+    }
+}
+
 public sealed class G1Work : ITaskHandler<G1Params, int>
 {
     public async Task<int> ExecuteAsync(TaskContext<G1Params> ctx, CancellationToken ct)

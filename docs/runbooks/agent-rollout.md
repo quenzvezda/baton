@@ -11,7 +11,9 @@ claiming, keeps heartbeating its running tasks until they finish, then exits.
 
 1. If the new build carries **new workflow versions**, deploy the Control Plane API first: it registers
    the definitions at startup, so their hashes exist before any agent can run them. Old agents never claim
-   tasks of a version they do not carry, so old and new agents can run side by side.
+   tasks of a version they do not carry, so old and new agents can run side by side. The new build must
+   still carry the old versions: runs started before the switch keep their version, and once the last old
+   agent is gone only the new build can finish them (G1 chaos report, "Rolling agent upgrade").
 2. Know the longest task duration in the group. A stopping agent must be given that long (the host's or
    orchestrator's stop timeout) or its running tasks are cut and retried.
 3. Confirm the group has room: during the rollout capacity shrinks by the agents being replaced.

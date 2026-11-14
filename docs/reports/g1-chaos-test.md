@@ -7,12 +7,13 @@
 **Result: pass.** Under continuous load, killing an agent mid-task, stopping one of two orchestrator replicas
 and restarting Postgres lost no accepted run, never granted two leases of one task at once, never accepted two
 results of one task, and never had a task executing twice at the same time. A rolling replacement of every
-agent under load failed no run and lost no attempt. One defect found on the way is fixed (finding F1).
+agent under load failed no run and lost no attempt, both with the same build and while upgrading to a new
+workflow version that only the new build carries. One defect found on the way is fixed (finding F1).
 
 | G1 criterion | Result | |
 | --- | --- | --- |
 | Kill an agent, kill one of two orchestrator replicas, restart Postgres under load: no accepted run lost, no task running twice concurrently | 344 accepted, 344 Succeeded; 0 overlapping leases; 0 double results; 0 overlapping executions | ✅ |
-| Rolling agent upgrade under load fails no runs (drain + definition-hash matching) | 212 accepted, 212 Succeeded; 0 lost attempts | ✅ |
+| Rolling agent upgrade under load fails no runs (drain + definition-hash matching) | Restart: 212 accepted, 212 Succeeded; 0 lost attempts. Upgrade `@1` → `@2`: 120 accepted, 120 Succeeded; 0 lost attempts; 0 `@2` attempts on old agents | ✅ |
 
 ## Failures under load
 
@@ -56,23 +57,57 @@ What each failure did:
   (30 s > 10 s), so no task was retried and no work was redone; work queued during the outage was dispatched
   as soon as Postgres was back.
 
-## Rolling agent upgrade
+## Rolling agent restart (same build)
 
-**Setup:** as above with 6 agents × 3 slots; 2 runs/s for 1:46. At 00:20 six new agents start; then every
-10 s one old agent is stopped normally (drain: it stops claiming, finishes its running tasks, reports them,
-exits).
+**Test:** `Rolling_agent_restart_under_load_fails_no_run`. **Setup:** as above with 6 agents × 3 slots;
+2 runs/s for 1:46. At 00:20 six new agents of the same build start; then every 10 s one old agent is stopped
+normally (drain: it stops claiming, finishes its running tasks, reports them, exits).
 
 | Metric | Value |
 | --- | --- |
 | Runs accepted / not Succeeded | 212 / 0 |
 | Task attempts | 848 |
-| Queued→Leased p50 / p95 / max | 7 / 13 / 29 ms |
+| Queued→Leased p50 / p95 / max | 7 / 16 / 86 ms |
 | Lost attempts | 0 — every task running on a stopping agent finished there |
 | Overlapping leases / double results / overlapping executions | 0 / 0 / 0 |
 
-Old agents held 1–3 running tasks each when stopped; all completed before the agent exited. Definition-hash
-matching is not exercised here — all agents run the same build, so they carry the same hashes; that a host
-claims only tasks whose hash it carries is covered by the M3 claim tests.
+Old agents held 0–3 running tasks each when stopped; all completed before the agent exited.
+
+## Rolling agent upgrade to a new workflow version
+
+**Test:** `Rolling_agent_upgrade_to_a_new_workflow_version_under_load_fails_no_run`. Follows the
+[agent rollout runbook](../runbooks/agent-rollout.md): Control Plane first, then the agents.
+
+**Setup:** as above with 6 agents × 3 slots. The old build carries `g1-pipeline@1` only; the new build carries
+`@1` and `@2` (`@2` adds a fifth task, `publish`, so its hash differs). The automation follows the latest
+version.
+
+| At | Event |
+| --- | --- |
+| 00:00 | producer starts: 2 runs/s of `@1` on 6 old agents |
+| 00:20 | `@2` registered (the API deploy): new runs are `@2`; no agent carries it yet |
+| 00:20 | 6 new agents start (carry `@1` and `@2`) |
+| 00:22–00:30 | the 6 old agents are drained and stopped one after another; the first two still held an `@1` task |
+| 01:00 | producer stops |
+| 01:09 | every run final |
+
+| Version | Runs succeeded / accepted | Attempts on old / new agents | Queued→Leased p95 / max |
+| --- | --- | --- | --- |
+| `@1` | 40 / 40 | 150 / 10 | 12 / 239 ms |
+| `@2` | 80 / 80 | **0** / 400 | 70 / 299 ms |
+
+| Metric | Value |
+| --- | --- |
+| Lost attempts | 0 |
+| Overlapping leases / double results / overlapping executions | 0 / 0 / 0 |
+
+Old agents never claimed an `@2` task, even while `@2` tasks waited and they had free slots (hash matching).
+`@1` runs that were in flight at the switch finished: their remaining tasks ran on old agents until those were
+drained and on new agents afterwards (10 attempts). `@2` tasks waited at most 0.3 s, the time the new agents
+took to register.
+
+Not covered: a new build that drops `@1`. Runs of `@1` would then wait Queued once the last old agent is gone,
+so a new build should keep every version that may still have runs in flight.
 
 ## Findings
 

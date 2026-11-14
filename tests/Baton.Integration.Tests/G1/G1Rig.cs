@@ -2,10 +2,12 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
+using Baton.Abstractions;
 using Baton.Domain.Automations;
 using Baton.Integration.Tests.Infrastructure;
 using Baton.Orchestrator.Dispatch;
 using Baton.Persistence.Queue;
+using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 
 namespace Baton.Integration.Tests.G1;
@@ -50,8 +52,10 @@ internal sealed class G1Rig : IAsyncDisposable
     /// <summary>Fire attempts that failed (e.g. while Postgres was down): never accepted, so not "lost".</summary>
     public ConcurrentQueue<string> RefusedFires { get; } = new();
 
+    /// <param name="agentsLack">Definition types the initial agents do not carry (an older build).</param>
     public static async Task<G1Rig> StartAsync(
-        int orchestrators, int agents, int slots, int leaseSeconds, string profile, Action<DispatchOptions>? dispatch = null)
+        int orchestrators, int agents, int slots, int leaseSeconds, string profile, Action<DispatchOptions>? dispatch = null,
+        Type[]? agentsLack = null)
     {
         var pg = PostgresFixture.Restartable();
         await pg.InitializeAsync();
@@ -71,20 +75,33 @@ internal sealed class G1Rig : IAsyncDisposable
 
         var rig = new G1Rig(pg, hosts, dispatch, groupId, group, token, automationId, cronAutomationId);
         for (var i = 0; i < agents; i++)
-            await rig.AddAgentAsync(slots, preferred: i % orchestrators);
+            await rig.AddAgentAsync(slots, preferred: i % orchestrators, lacks: agentsLack);
         await Eventually.UntilAsync(() => HostData.ScalarAsync<long>(pg, "SELECT count(*) FROM hosts WHERE host_group_id = @g", ("g", groupId)),
             n => n == agents, "every agent registered", TimeSpan.FromSeconds(60));
         return rig;
     }
 
-    /// <summary>A new agent that prefers replica <paramref name="preferred"/> and fails over to the others.</summary>
-    public async Task<AgentProcess> AddAgentAsync(int slots, int preferred = 0)
+    /// <summary>
+    /// A new agent that prefers replica <paramref name="preferred"/> and fails over to the others. It carries every
+    /// public definition of this assembly except <paramref name="lacks"/>, so it reports only those hashes.
+    /// </summary>
+    public async Task<AgentProcess> AddAgentAsync(int slots, int preferred = 0, Type[]? lacks = null)
     {
         var live = _orchestrators.Where(o => o is not null).Select(o => o!.Address).ToList();
         var first = live[preferred % live.Count];
-        var agent = await AgentProcess.StartAsync(first, Group, Token, slots, failover: live.Where(a => a != first).ToList());
+        var agent = await AgentProcess.StartAsync(first, Group, Token, slots, failover: live.Where(a => a != first).ToList(),
+            services: lacks is { Length: > 0 } ? s => WithoutDefinitions(s, lacks) : null);
         _agents.Add(agent);
         return agent;
+    }
+
+    private static void WithoutDefinitions(IServiceCollection services, Type[] lacks)
+    {
+        for (var i = services.Count - 1; i >= 0; i--)
+        {
+            if (services[i].ServiceType == typeof(IWorkflowDefinition) && lacks.Contains(services[i].ImplementationType))
+                services.RemoveAt(i);
+        }
     }
 
     /// <summary>Starts the cron trigger (<c>* * * * *</c>, UTC) from the next minute.</summary>
