@@ -1,8 +1,8 @@
 # ADR-0018: Run notifications through a Postgres outbox
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-14
-- **Deciders:** @Ripan (M7 kickoff 2026-11-14)
+- **Deciders:** @Ripan (M7 kickoff 2026-11-14; accepted with the instruction to implement M7, 2026-11-14)
 - **Spec:** §4 "How a run flows" step 6 · OBS-05 · OQ-08 · OpenSpec change `add-operability-and-insight` (design.md decisions 4, 6, 16–23)
 
 ## Context

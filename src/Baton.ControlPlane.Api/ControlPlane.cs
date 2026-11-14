@@ -5,6 +5,7 @@ using Baton.ControlPlane.Api.Queue;
 using Baton.ControlPlane.Api.Runs;
 using Baton.ControlPlane.Api.Security;
 using Baton.ControlPlane.Api.Workflows;
+using Baton.Domain.Notifications;
 using Baton.Persistence;
 using Baton.Persistence.Security;
 
@@ -23,6 +24,7 @@ public static class ControlPlane
 
         // Webhook and notification secrets (ADR-0015, ADR-0018): the key ring shared with the orchestrator.
         services.AddBatonDataProtection(configuration);
+        services.Configure<NotificationPolicy>(configuration.GetSection(NotificationPolicy.Section));
         services.AddSingleton<WebhookSecrets>();
         return services;
     }

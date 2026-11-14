@@ -19,6 +19,8 @@
     <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
     <PackageReference Include="Npgsql.OpenTelemetry" />
+    <!-- Email notifications (OBS-05, ADR-0019) -->
+    <PackageReference Include="MailKit" />
   </ItemGroup>
   <ItemGroup>
     <!-- OpenTelemetry baseline, shared as source (M0 task 3.3) -->

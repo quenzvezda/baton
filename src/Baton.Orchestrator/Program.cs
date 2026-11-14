@@ -1,6 +1,7 @@
 using Baton.Orchestrator.Agents;
 using Baton.Orchestrator.Health;
 using Baton.Orchestrator.Loops;
+using Baton.Orchestrator.Notifications;
 using Baton.Persistence;
 using Baton.Persistence.Security;
 using Baton.Telemetry;
@@ -28,6 +29,8 @@ builder.Services.AddAgentProtocol(builder.Configuration);
 builder.Services.AddOrchestratorMetrics();
 builder.Services.AddHostedService<PartitionMaintenanceLoop>();
 builder.Services.AddDispatchLoops();
+//   M7: NotificationLoop (5 s, SKIP LOCKED; OBS-05), QueueMetricsLoop (15 s; with the dispatch loops)
+builder.Services.AddNotifications(builder.Configuration);
 
 var app = builder.Build();
 

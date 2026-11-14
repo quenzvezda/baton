@@ -32,13 +32,13 @@
 
 ## 5. Notifications (OBS-05)
 
-- [ ] 5.1 ADR-0018 and ADR-0019 accepted by the owner; `MailKit` in `Directory.Packages.props`; `mailpit` service in `docker-compose.yml` and SMTP settings in `appsettings.Development.json`; verify `docker compose up -d` starts Mailpit on 1025/8025 and the build is clean
-- [ ] 5.2 Notification channels on the automation API, write-only URL, one-time signing secret, rotate-secret, clone drops webhook channels (decision 16); verify `Email_channel_round_trips`, `Invalid_channel_is_rejected_with_a_field_message`, `Read_shows_only_the_webhook_host`, `Update_without_url_keeps_the_stored_url`, `Clone_drops_webhook_channels`
-- [ ] 5.3 Enqueue in `RunFinalizer` (decision 18); verify Testcontainers tests `Failed_run_schedules_one_delivery_per_matching_channel`, `Timed_out_run_notifies_channels_on_timed_out`, `Succeeded_and_cancelled_runs_schedule_nothing`, `Deleted_automation_schedules_nothing`, `Rolled_back_finish_schedules_nothing`
-- [ ] 5.4 `NotificationLoop` with lease-style claiming and retries (decision 19); verify `Delivery_retries_after_503_and_is_recorded_sent`, `Delivery_fails_after_5_attempts_and_the_run_stays_failed` (OQ-08), `Non_retryable_4xx_fails_at_once`, `Crashed_sender_delivery_is_retried_after_the_lock_expires`, and the concurrent-actor test `Two_loops_send_each_delivery_once`
-- [ ] 5.5 Webhook sender (decisions 20–21); verify against an in-process receiver `Webhook_signature_verifies_with_the_channel_secret`, `Retry_carries_the_same_delivery_id`, `Redirect_is_not_followed`, `Body_lists_failed_tasks_and_console_link`
-- [ ] 5.6 Email sender (decisions 20, 22); verify against a Mailpit Testcontainer `Email_names_automation_outcome_and_failed_tasks` and `Unconfigured_smtp_fails_email_deliveries_at_once`
-- [ ] 5.7 Notification metrics and run events (decision 30); verify `Sent_and_failed_notifications_are_counted_by_kind` and that the run timeline shows `notification.sent` / `notification.failed`; add the webhook allowlist and key ring settings to the deployment runbook
+- [x] 5.1 ADR-0018 and ADR-0019 accepted by the owner; `MailKit` in `Directory.Packages.props`; `mailpit` service in `docker-compose.yml` and SMTP settings in `appsettings.Development.json`; verify `docker compose up -d` starts Mailpit on 1025/8025 and the build is clean
+- [x] 5.2 Notification channels on the automation API, write-only URL, one-time signing secret, rotate-secret, clone drops webhook channels (decision 16); verify `Email_channel_round_trips`, `Invalid_channel_is_rejected_with_a_field_message`, `Read_shows_only_the_webhook_host`, `Update_without_url_keeps_the_stored_url`, `Clone_drops_webhook_channels`
+- [x] 5.3 Enqueue in `RunFinalizer` (decision 18); verify Testcontainers tests `Failed_run_schedules_one_delivery_per_matching_channel`, `Timed_out_run_notifies_channels_on_timed_out`, `Succeeded_and_cancelled_runs_schedule_nothing`, `Deleted_automation_schedules_nothing`, `Rolled_back_finish_schedules_nothing`
+- [x] 5.4 `NotificationLoop` with lease-style claiming and retries (decision 19); verify `Delivery_retries_after_503_and_is_recorded_sent`, `Delivery_fails_after_5_attempts_and_the_run_stays_failed` (OQ-08), `Non_retryable_4xx_fails_at_once`, `Crashed_sender_delivery_is_retried_after_the_lock_expires`, and the concurrent-actor test `Two_loops_send_each_delivery_once`
+- [x] 5.5 Webhook sender (decisions 20–21); verify against an in-process receiver `Webhook_signature_verifies_with_the_channel_secret`, `Retry_carries_the_same_delivery_id`, `Redirect_is_not_followed`, `Body_lists_failed_tasks_and_console_link`
+- [x] 5.6 Email sender (decisions 20, 22); verify against a Mailpit Testcontainer `Email_names_automation_outcome_and_failed_tasks` and `Unconfigured_smtp_fails_email_deliveries_at_once`
+- [x] 5.7 Notification metrics and run events (decision 30); verify `Sent_and_failed_notifications_are_counted_by_kind` and that the run timeline shows `notification.sent` / `notification.failed`; document the settings (webhook allowlist, SMTP, key ring on both processes) in `docs/runbooks/notifications.md`
 
 ## 6. Telemetry (OBS-06)
 

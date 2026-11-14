@@ -316,7 +316,8 @@ Today's state, from the code:
     stored URL or secret can no longer be decrypted.
 22. **Email sending.** `SmtpNotificationSender` uses MailKit (ADR-0019) with `Baton:Notifications:Smtp`
     (`Host`, `Port`, `Security`: `StartTls|SslOnConnect|None`, `UserName`, `Password` from the
-    environment, `From`). One connection is opened per tick batch. Transient SMTP failures (4xx replies,
+    environment, `From`). One connection per message: at most 20 deliveries a tick, so connection reuse is not
+    worth the failure handling it would need. Transient SMTP failures (4xx replies,
     I/O errors) are retried. 5xx replies fail at once. If SMTP is not configured, email deliveries fail at
     once with "email delivery is not configured", and startup logs a warning when email channels exist.
     Options are validated at startup.

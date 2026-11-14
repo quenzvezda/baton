@@ -1,8 +1,8 @@
 # ADR-0019: Email delivery with MailKit, Mailpit for local development
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-14
-- **Deciders:** @Ripan (M7 kickoff 2026-11-14)
+- **Deciders:** @Ripan (M7 kickoff 2026-11-14; accepted with the instruction to implement M7, 2026-11-14)
 - **Spec:** OBS-05 · ADR-0018 · OpenSpec change `add-operability-and-insight` (design.md decisions 5, 22)
 
 ## Context

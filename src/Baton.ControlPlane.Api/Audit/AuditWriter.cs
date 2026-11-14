@@ -71,7 +71,20 @@ public static class AuditWriter
         return json;
     }
 
-    /// <summary>Adds an entry whose sides are already snapshots (see <see cref="Snapshot"/>).</summary>
+    /// <summary>
+    /// The snapshot of <paramref name="value"/> with one extra top-level property, e.g. which write-only secrets an
+    /// update replaced, so the entry says a secret changed without holding it.
+    /// </summary>
+    public static string? Snapshot(object value, (string Name, object Value) extra)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+
+        var node = System.Text.Json.Nodes.JsonNode.Parse(Snapshot(value)!)!.AsObject();
+        node[JsonNamingPolicy.CamelCase.ConvertName(extra.Name)] = JsonSerializer.SerializeToNode(extra.Value, extra.Value.GetType(), Options);
+        return node.ToJsonString();
+    }
+
+    /// <summary>Adds an entry whose sides are already snapshots (see <see cref="Snapshot(object?)"/>).</summary>
     public static void AddSnapshots(
         BatonDbContext db, ClaimsPrincipal user, string entityType, string entityId, string action, string? before, string? after)
     {
