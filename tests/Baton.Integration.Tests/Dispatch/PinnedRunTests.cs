@@ -5,8 +5,23 @@ namespace Baton.Integration.Tests.Dispatch;
 
 /// <summary>ORC-12: PinnedRun placement in the claim, drain and reaper paths (M6 tasks 4.2–4.5).</summary>
 [Collection(PostgresCollectionDefinition.Name)]
-public sealed class PinnedRunTests(PostgresFixture pg)
+public sealed class PinnedRunTests(PostgresFixture pg) : IAsyncLifetime
 {
+    public Task InitializeAsync() => Task.CompletedTask;
+
+    /// <summary>
+    /// Ends the pinned runs these tests leave behind: once their test hosts stop heartbeating, the reaper of a later
+    /// test would fail them (pinned host lost) and count their leased tasks in its own pass.
+    /// </summary>
+    public Task DisposeAsync() => HostData.ExecuteAsync(pg, """
+        UPDATE task_runs t SET status = 'cancelled', finished_at = now(), cancel_requested = false
+        FROM workflow_runs r
+        WHERE r.id = t.workflow_run_id AND r.placement_mode = 'pinned_run'
+          AND t.status NOT IN ('succeeded','failed','skipped','cancelled');
+        UPDATE workflow_runs SET status = 'cancelled', finished_at = now()
+        WHERE placement_mode = 'pinned_run' AND status IN ('pending','running','cancelling');
+        """);
+
     [Fact]
     public async Task Pin_labels_are_the_union_of_every_task_label()
     {
