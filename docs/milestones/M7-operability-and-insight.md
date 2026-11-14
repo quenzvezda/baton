@@ -1,6 +1,6 @@
 # M7 — Operability & insight
 
-**Phase:** 2 · **Change:** `add-operability-and-insight` *(create when starting)* · **Depends on:** G1
+**Phase:** 2 · **Change:** `add-operability-and-insight` · **Depends on:** G1
 
 ## Goal
 
@@ -18,10 +18,10 @@ Operators see problems early, are notified, can recover failed runs cheaply and 
 
 ## ADRs / open questions
 
-OQ-08 (should a failed notification task fail the run?).
+ADR-0018 (notification outbox), ADR-0019 (email with MailKit), OQ-08 (should a failed notification task fail the run?).
 
 ## Exit criteria
 
 - [ ] Change created, validated, implemented and archived
-- [ ] Re-run reuses outputs and records the new attempts on the same run (or a linked run — decide in design)
-- [ ] OQ-08 answered
+- [ ] Re-run reuses outputs and records the new attempts on the same run (decided: same run, change design.md decision 1)
+- [x] OQ-08 answered: a failed notification is reported, it never fails the run (change design.md decision 6, 2026-11-14)

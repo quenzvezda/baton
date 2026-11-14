@@ -20,7 +20,7 @@ Each milestone maps to one OpenSpec change (ADR-0002). Phase-1 changes are alrea
 | [M5](docs/milestones/M5-web-console-and-monitoring.md) | Web console & run monitoring | OBS-01..03, WF-09 (UI), HST-06 (UI), AUT-03 (form) | `add-web-console-and-monitoring` | Done |
 | **[G1](docs/milestones/G1-v1-production-readiness.md)** | **Gate: v1 production readiness** | NFRs (§3) | `add-history-retention`, `harden-webhook-signatures` | Done |
 | [M6](docs/milestones/M6-scheduling-and-routing.md) | Scheduling & routing controls | AUT-08, AUT-10, ORC-06, ORC-12, ORC-13 | `add-scheduling-and-routing-controls` | Done |
-| [M7](docs/milestones/M7-operability-and-insight.md) | Operability & insight | AUT-11, WF-10, OBS-04, OBS-05, OBS-06 | `add-operability-and-insight` *(to create)* | Phase 2 |
+| [M7](docs/milestones/M7-operability-and-insight.md) | Operability & insight | AUT-11, WF-10, OBS-04, OBS-05, OBS-06 | `add-operability-and-insight` | In progress |
 | **[G2](docs/milestones/G2-phase-2-exit.md)** | **Gate: phase 2 exit** | SLOs in production | — | — |
 | [M8](docs/milestones/M8-extensibility.md) | Extensibility | AUT-12, WF-11, ORC-14, event triggers | `add-*` *(to create, likely several)* | Phase 3 |
 

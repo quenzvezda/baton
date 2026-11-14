@@ -33,3 +33,5 @@ Statuses: `Proposed` · `Accepted` · `Rejected` · `Deprecated` · `Superseded 
 | [0015](0015-webhook-secrets-with-data-protection.md) | Webhook secrets encrypted with ASP.NET Core Data Protection | Accepted | §3, AUT-04 |
 | [0016](0016-json-schema-validation-with-jsonschema-net.md) | Validate automation parameters with JsonSchema.Net | Accepted | AUT-03 |
 | [0017](0017-keycloak-as-development-identity-provider.md) | Keycloak as the local development identity provider | Accepted | §3 |
+| [0018](0018-run-notifications-through-a-postgres-outbox.md) | Run notifications through a Postgres outbox | Proposed | §4, OBS-05, OQ-08 |
+| [0019](0019-email-delivery-with-mailkit.md) | Email delivery with MailKit, Mailpit for local development | Proposed | OBS-05 |
