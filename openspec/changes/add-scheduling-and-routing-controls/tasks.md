@@ -2,9 +2,9 @@
 
 ## 1. Schema and domain
 
-- [ ] 1.1 Migration `SchedulingAndRouting` (design.md "Migration Plan"): `catch_up_limit` with its CHECKs, `workflow_runs.placement_mode` and `pin_labels`, `task_runs.pinned_run`, drop `task_runs.pinned_host_id`, `ix_runs_pinned`, `cancel_reason` gains `pinned_host_lost`; verify `Schema_matches_baseline` (updated for the new columns) and `Migration_keeps_existing_runs_per_task` (`dotnet test tests/Baton.Integration.Tests --filter Schema`)
-- [ ] 1.2 `MisfirePlanner` (decision 6) in `Baton.Domain`; verify unit tests `FireOnce_fires_the_most_recent_missed_time`, `Skip_fires_no_missed_time`, `CatchUp_fires_the_most_recent_N_in_time_order`, `Fire_up_to_60_s_late_is_on_time`, `On_time_fire_after_missed_ones_always_fires`, `Long_outage_is_counted_without_unbounded_memory`
-- [ ] 1.3 Aging formula in `TaskPriority` (ORC-06) with step and cap; verify unit tests for the spec scenarios Waiting task ages (42), Cap (60), Ceiling (100) and `Cap_zero_disables_aging`
+- [x] 1.1 Migration `SchedulingAndRouting` (design.md "Migration Plan"): `catch_up_limit` with its CHECKs, `workflow_runs.placement_mode` and `pin_labels`, `task_runs.pinned_run`, drop `task_runs.pinned_host_id`, `ix_runs_pinned`, `cancel_reason` gains `pinned_host_lost`; verify `Schema_matches_baseline` (updated for the new columns) and `Migration_keeps_existing_runs_per_task` (`dotnet test tests/Baton.Integration.Tests --filter Schema`)
+- [x] 1.2 `MisfirePlanner` (decision 6) in `Baton.Domain`; verify unit tests `FireOnce_fires_the_most_recent_missed_time`, `Skip_fires_no_missed_time`, `CatchUp_fires_the_most_recent_N_in_time_order`, `Fire_up_to_60_s_late_is_on_time`, `On_time_fire_after_missed_ones_always_fires`, `Long_outage_is_counted_without_unbounded_memory`
+- [x] 1.3 Aging formula in `TaskPriority` (ORC-06) with step and cap; verify unit tests for the spec scenarios Waiting task ages (42), Cap (60), Ceiling (100) and `Cap_zero_disables_aging`
 
 ## 2. Misfire policy and fire time preview (AUT-08, AUT-10)
 

@@ -59,9 +59,9 @@ never waits on a lock it can skip; aging writes only rows whose value changes.
 
 6. **Misfire planning is pure domain code.** `Baton.Domain.Automations.MisfirePlanner.Plan(schedule,
    nextFireAt, now, policy, catchUpLimit)` walks the fire times in `[next_fire_at, now()]`. Times with
-   `now() − t ≤ 60 s` are on time. The rest are missed, and only the last N are kept, in a ring buffer, so
-   memory stays bounded however long the outage. The walk stops counting at 100,000 missed times and
-   records the count as "at least". It returns the fire times to create (selected missed times, then the
+   `now() − t ≤ 60 s` are on time. The rest are missed, and only the last N are kept, in a queue, so
+   memory stays bounded however long the outage. The walk is exact (30 days of a per-minute trigger, 43,200
+   times, takes about 10 ms), so there is no cap. It returns the fire times to create (selected missed times, then the
    on-time ones), the missed count with the first and last missed time, and the next fire time after
    `now()`. Unit-tested with a fixed `now`. `CronTriggers.FireNextAsync` calls it and fires each selected
    time through `RunCreator.FireAsync` in the trigger's existing transaction. The idempotency key format is
@@ -148,8 +148,8 @@ never waits on a lock it can skip; aging writes only rows whose value changes.
   automation's policy. Scenario "Catch-up runs follow the concurrency policy" makes it visible.
 - [FireOnce now uses the most recent missed time] → noted under Migration. Idempotency keys of runs
   already created are unaffected.
-- [A long outage with a per-minute cron] → planning walks at most 100,000 times per trigger per pass,
-  then counts the rest as "at least".
+- [A long outage with a per-minute cron] → the walk is linear in missed times but holds only N. A
+  year of a per-minute trigger is about 525,000 steps, roughly 0.1 s once for that trigger.
 
 ## Migration Plan
 

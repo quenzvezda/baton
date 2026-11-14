@@ -17,6 +17,9 @@ public sealed class AutomationTriggerEntity
     /// <summary><c>fire_once</c> | <c>skip</c> | <c>catch_up</c>.</summary>
     public string MisfirePolicy { get; set; } = "fire_once";
 
+    /// <summary>How many of the most recent missed fire times CatchUp runs, 1–10; set only for <c>catch_up</c> (AUT-08).</summary>
+    public short? CatchUpLimit { get; set; }
+
     public DateTimeOffset? NextFireAt { get; set; }
     public DateTimeOffset? LastFiredAt { get; set; }
     /// <summary>The webhook secret, encrypted with Data Protection (ADR-0015).</summary>

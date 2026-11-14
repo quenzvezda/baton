@@ -56,9 +56,18 @@ public sealed class CronSchedule
 
     /// <summary>
     /// The first fire time strictly after <paramref name="after"/>, or <c>null</c> when the expression never
-    /// fires again. After downtime pass the database's <c>now()</c>: v1 fires a missed time once and then
-    /// moves to the next future time (FireOnce, design.md "Next fire").
+    /// fires again. After downtime pass the database's <c>now()</c>; which missed times fire is
+    /// <see cref="MisfirePlanner"/>'s decision (AUT-08).
     /// </summary>
     public DateTimeOffset? NextAfter(DateTimeOffset after) =>
         _expression.GetNextOccurrence(after, _zone, inclusive: false)?.ToUniversalTime();
+
+    /// <summary>Fire times strictly after <paramref name="after"/> up to and including <paramref name="until"/>, in order, lazily.</summary>
+    public IEnumerable<DateTimeOffset> Between(DateTimeOffset after, DateTimeOffset until) =>
+        after >= until
+            ? []
+            : _expression.GetOccurrences(after, until, _zone, fromInclusive: false, toInclusive: true).Select(t => t.ToUniversalTime());
+
+    /// <summary>The time zone the expression is evaluated in.</summary>
+    public TimeZoneInfo Zone => _zone;
 }

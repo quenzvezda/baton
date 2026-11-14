@@ -1,4 +1,5 @@
 using Baton.Integration.Tests.Infrastructure;
+using Baton.Integration.Tests.Workflows;
 using Npgsql;
 
 namespace Baton.Integration.Tests.Schema;
@@ -69,6 +70,19 @@ public sealed class SchemaTests(PostgresFixture pg)
         Assert.Multiple(
             () => Assert.Empty(missingFromMigration),
             () => Assert.Empty(notInBaseline));
+    }
+
+    // M6 task 1.1: the new run columns default so that runs created without a placement stay PerTask.
+    [Fact]
+    public async Task Migration_keeps_existing_runs_per_task()
+    {
+        var scenario = await DispatchScenario.CreateAsync(pg, wf => wf.Task<Noop>("a"));
+        var runId = await scenario.StartRunAsync();
+
+        Assert.Equal("per_task", await HostData.ScalarAsync<string>(pg,
+            "SELECT placement_mode FROM workflow_runs WHERE id = @id", ("id", runId)));
+        Assert.False(await HostData.ScalarAsync<bool>(pg,
+            "SELECT bool_or(pinned_run) FROM task_runs WHERE workflow_run_id = @id", ("id", runId)));
     }
 
     private async Task<HashSet<string>> DescribeBaselineAsync()

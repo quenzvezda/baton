@@ -47,7 +47,6 @@ public sealed class TaskClaims(NpgsqlDataSource dataSource, DefinitionGraphCache
             AND host_group_id = @groupId
             AND required_labels <@ @labels
             AND definition_hash = ANY (@hashes)
-            AND (pinned_host_id IS NULL OR pinned_host_id = @hostId)
           ORDER BY effective_priority DESC, queued_at
           LIMIT @budget
           FOR UPDATE SKIP LOCKED),
